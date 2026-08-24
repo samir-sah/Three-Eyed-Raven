@@ -1,0 +1,11 @@
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.env
+data/
+models/
+artifacts/
+*.pt
+config.json
+multi_config.json

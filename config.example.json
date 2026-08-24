@@ -1,0 +1,20 @@
+{
+  "source": "data/sample.mp4",
+  "output_dir": "artifacts/demo",
+  "model": "yolo11n.pt",
+  "device": "auto",
+  "confidence_threshold": 0.35,
+  "iou_threshold": 0.5,
+  "frame_stride": 1,
+  "max_frames": null,
+  "display": false,
+  "save_video": true,
+  "tracker": "bytetrack.yaml",
+  "zones": [
+    {
+      "id": "gate_a",
+      "points": [[30, 30], [600, 30], [600, 500], [30, 500]],
+      "occupancy_alert_threshold": 15
+    }
+  ]
+}
