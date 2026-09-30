@@ -58,6 +58,17 @@ python -m crowd_tracker.tracking_eval_cli --ground-truth examples\tracking_groun
 
 The bundled files are a format example only. Report real results only after evaluating against a labeled benchmark such as MOT17 or VisDrone-MOT; do not treat demo footage as ground truth.
 
+## Local run API
+
+The read-only FastAPI service exposes completed pipeline artifacts for dashboard or future operator clients. It does not start tracking jobs or make identity decisions.
+
+```bat
+set PYTHONPATH=src
+python -m uvicorn crowd_tracker.api:app --host 127.0.0.1 --port 8000
+```
+
+Open `http://127.0.0.1:8000/docs` for interactive API documentation. Available endpoints are `GET /health`, `GET /runs`, and `GET /runs/{run_id}`. Set `CROWD_TRACKER_ARTIFACTS` to use a different artifact directory.
+
 ## Next implementation steps
 
 1. Evaluate detection and tracking on VisDrone/MOT17 rather than relying on a visual demo.
