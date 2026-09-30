@@ -227,7 +227,51 @@ function FullMotBenchmark({ benchmark }) {
   return <section className="card evaluation-card full-benchmark-card"><div className="card-heading"><div><span className="eyebrow">MOT17 CROSS-DOMAIN EVALUATION</span><h2>Strong precision, limited ground-camera recall</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} ground-truth boxes · {relativeTime(benchmark.updatedAt)}</p></div><span className="subtle-pill">Measured baseline</span></div><p className="benchmark-conclusion">This is a stress test: the VisDrone aerial-trained detector and ByteTrack were evaluated on MOT17 ground-surveillance footage. It is usually right when it detects someone ({number(benchmark.precision * 100, 1)}% precision), but it misses many people ({number(benchmark.recall * 100, 1)}% recall). This is a domain gap, not production-ready CCTV performance.</p><details className="metric-details"><summary>Explain and show all MOT17 metrics</summary><p>MOTA combines missed detections, false positives and ID changes; MOTP measures box alignment; IDF1 measures track identity continuity; HOTA balances detection and association. Higher is better except for ID switches.</p><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></details></section>;
 }
 
-function UploadRunPanel({ onCompleted }) {
+function TrackAndAlerts({ run, metrics }) {
+  const tracks = run.isMulti
+    ? run.streams.map((stream) => ({ id: stream.id, label: stream.label, detail: `${number(stream.frames)} frames · peak ${number(stream.peakCount)} people · ${stream.detector}`, value: number(stream.localTracks), valueLabel: "local IDs" }))
+    : (run.tracks ?? []).slice(0, 5).map((track) => ({ id: track.id, label: `local-${track.id}`, detail: `Frames ${track.firstFrame}–${track.lastFrame}`, value: `${number(track.meanConfidence * 100, 0)}%`, valueLabel: "confidence" }));
+  return <div className="track-alert-grid">
+    <section className="compact-inset">
+      <div className="compact-heading"><div><span className="eyebrow">TRACK HEALTH</span><h3>{run.isMulti ? "Independent camera summaries" : "Most persistent IDs"}</h3></div><span className="subtle-pill">{number(metrics.uniqueTracks)} total</span></div>
+      <div className="track-list">{tracks.length ? tracks.map((track) => <div className="track-row" key={track.id}><span className="track-avatar">{run.isMulti ? <Video size={14} /> : track.id}</span><div><strong>{track.label}</strong><small>{track.detail}</small></div><div className="confidence"><strong>{track.value}</strong><small>{track.valueLabel}</small></div></div>) : <p className="muted">No tracked-person observations were recorded.</p>}</div>
+    </section>
+    <section className="compact-inset">
+      <div className="compact-heading"><div><span className="eyebrow">ALERTS</span><h3>Zone activity</h3></div><span className="subtle-pill">{number(metrics.alertCount)} total</span></div>
+      <div className="alert-box"><CircleAlert size={18} /><div><strong>{metrics.alertCount ? `${metrics.alertCount} crowd alert${metrics.alertCount === 1 ? "" : "s"}` : "No crowd alerts"}</strong><span>{metrics.alertCount ? "Zone threshold crossings are listed below." : "Zone threshold was not exceeded in this run."}</span></div></div>
+      <AlertHistory alerts={run.alerts} />
+    </section>
+  </div>;
+}
+
+function PerformanceWorkspace({ run, metrics }) {
+  return <div className="performance-workspace">
+    {!run.isMulti && <section className="compact-inset"><div className="compact-heading"><div><span className="eyebrow">FRAME-BY-FRAME ANALYSIS</span><h3>Observed people over time</h3><p>Unique local track IDs visible in each processed frame.</p></div><div className="chart-legend"><span><i className="legend-line" /> People detected</span><span><Clock3 size={15} /> 0–{number(metrics.frames)}</span></div></div><OccupancyChart timeline={run.timeline} /><div className="chart-labels"><span>Start</span><span>Peak: {number(metrics.peakCount)} people</span><span>End</span></div></section>}
+    <section className="compact-inset"><div className="compact-heading"><div><span className="eyebrow">PIPELINE PROFILING</span><h3>Stage latency breakdown</h3><p>Measured during this completed run.</p></div><span className="subtle-pill">milliseconds</span></div><LatencyProfile stages={run.latencyProfile} /></section>
+    {run.evaluation && <EvaluationResults evaluation={run.evaluation} />}
+  </div>;
+}
+
+function SupportingWorkspace({ run, data, metrics, refreshedAt, activePanel, onPanelChange }) {
+  const panels = [
+    ["review", run.isMulti ? "Match review" : "Track details"],
+    ["tracking", "Camera activity"],
+    ["performance", "Performance"],
+    ["development", "Development"],
+  ];
+  return <section id="supporting-workspace" className="card supporting-workspace">
+    <div className="card-heading"><div><span className="eyebrow">SUPPORTING DETAILS</span><h2>Explore the run without leaving playback</h2><p>Switch views to inspect evidence, activity, performance, or project progress.</p></div></div>
+    <div className="workspace-tabs" role="tablist" aria-label="Supporting dashboard details">{panels.map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={activePanel === id} className={activePanel === id ? "workspace-tab workspace-tab-active" : "workspace-tab"} onClick={() => onPanelChange(id)}>{label}</button>)}</div>
+    <div className="workspace-panel" role="tabpanel">
+      {activePanel === "review" && (run.isMulti ? <ReIdCandidates reid={run.reid} /> : <TrackAndAlerts run={run} metrics={metrics} />)}
+      {activePanel === "tracking" && <TrackAndAlerts run={run} metrics={metrics} />}
+      {activePanel === "performance" && <PerformanceWorkspace run={run} metrics={metrics} />}
+      {activePanel === "development" && <div className="development-workspace"><section className="compact-inset development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></section><section className="compact-inset run-details"><span className="eyebrow">RUN DETAILS</span><dl><div><dt>Input</dt><dd>{metrics.source}</dd></div><div><dt>Last refresh</dt><dd>{refreshedAt ? refreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</dd></div></dl></section><TrainingProgress training={data.training} /><FullMotBenchmark benchmark={data.benchmark} /></div>}
+    </div>
+  </section>;
+}
+
+function UploadRunPanel({ onCompleted, initiallyOpen = false }) {
   const [aerial, setAerial] = useState(null);
   const [ground, setGround] = useState(null);
   const [maxFrames, setMaxFrames] = useState("600");
@@ -275,7 +319,9 @@ function UploadRunPanel({ onCompleted }) {
   }
 
   const status = job?.status;
-  return <section className="card upload-run-panel">
+  return <details className="card upload-run-panel" open={initiallyOpen}>
+    <summary className="upload-summary"><span><span className="eyebrow">YOUR TWO-CAMERA RUN</span><strong>Upload and analyse another video pair</strong></span><span className="subtle-pill">Open uploader</span></summary>
+    <div className="upload-run-content">
     <div className="card-heading"><div><span className="eyebrow">YOUR TWO-CAMERA RUN</span><h2>Upload aerial and ground videos</h2><p>Files remain on this computer. The system detects people, creates local tracks, and produces visual-similarity suggestions for manual review.</p></div><span className="subtle-pill">Local processing</span></div>
     <form className="upload-form" onSubmit={submit}>
       <label className={aerial ? "upload-slot upload-slot-ready" : "upload-slot"}><Upload size={19} /><span><b>Aerial / drone video</b><small>{aerial ? aerial.name : "MP4, AVI, MOV, MKV, MPG or WebM"}</small></span><input type="file" accept="video/*,.mp4,.avi,.mov,.mkv,.mpg,.mpeg,.webm" onChange={(event) => setAerial(event.target.files?.[0] ?? null)} /></label>
@@ -286,7 +332,8 @@ function UploadRunPanel({ onCompleted }) {
     {message && <p className="upload-message upload-message-error">{message}</p>}
     {job && <div className={status === "failed" ? "upload-message upload-message-error" : "upload-message"}><strong>{status === "completed" ? "Analysis complete" : status === "failed" ? "Analysis failed" : "Working on your run"}</strong><span>{job.error ?? job.stage}</span>{status === "completed" && <small>Your new run is selected above. Open the playback below to review it.</small>}</div>}
     <p className="upload-privacy"><CircleAlert size={14} /> Similar-looking people are only placed in a manual-review queue; the project does not verify identity or make automated decisions about people.</p>
-  </section>;
+    </div>
+  </details>;
 }
 
 export default function DashboardClient() {
@@ -294,6 +341,7 @@ export default function DashboardClient() {
   const [service, setService] = useState({ available: false, runCount: 0 });
   const [selectedRun, setSelectedRun] = useState("");
   const [activeSection, setActiveSection] = useState("overview");
+  const [activeWorkspace, setActiveWorkspace] = useState("review");
   const [loading, setLoading] = useState(true);
   const [refreshedAt, setRefreshedAt] = useState(null);
 
@@ -325,7 +373,10 @@ export default function DashboardClient() {
   const metrics = run?.metrics;
   const goToSection = (section) => {
     setActiveSection(section);
-    requestAnimationFrame(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    const workspaceForSection = { tracking: "tracking", alerts: "tracking", development: "development" }[section];
+    if (workspaceForSection) setActiveWorkspace(workspaceForSection);
+    const target = workspaceForSection ? "supporting-workspace" : section;
+    requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
   const selectUploadedRun = async (runId) => {
     await loadDashboard();
@@ -370,7 +421,7 @@ export default function DashboardClient() {
           </div>
 
           {!run ? <EmptyState /> : <>
-            <UploadRunPanel onCompleted={selectUploadedRun} />
+            <UploadRunPanel onCompleted={selectUploadedRun} initiallyOpen={!run.hasVideo} />
             <div id="overview" className="metric-grid">
               <MetricCard icon={Video} label="Processed frames" value={number(metrics.frames)} note={`${metrics.resolution} source resolution`} />
               <MetricCard icon={Activity} label="Peak visible tracks" value={number(metrics.peakCount)} note={run.isMulti ? "In one camera; not added across views" : `Observed around frame ${number(metrics.peakFrame)}`} accent />
@@ -385,37 +436,9 @@ export default function DashboardClient() {
                 <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2><p>{run.detector ?? "Detector not recorded"}</p></div><span className="live-badge"><span /> Recorded run</span></div>
                 {run.hasVideo ? (run.isMulti ? <MultiStreamPlayer streams={run.streams} sourceId={run.id} /> : <FramePlayer frames={run.previewFrames} videoUrl={run.videoUrl} sourceId={run.id} previewFps={run.previewFps} />) : <EmptyState />}
                 <div className="video-footer"><span><CheckCircle2 size={16} /> {run.isMulti ? "Both feeds processed with independent local trackers" : "Detection & local tracking completed"}</span>{!run.isMulti && <a href={run.videoUrl} download><Download size={16} /> Download MP4</a>}</div>
-                {run.isMulti && <ReIdCandidates reid={run.reid} />}
-              </section>
-
-              <section id="tracking" className="card tracks-card">
-                <div className="card-heading"><div><span className="eyebrow">TRACK HEALTH</span><h2>{run.isMulti ? "Independent camera summaries" : "Most persistent IDs"}</h2></div><span className="subtle-pill">{number(metrics.uniqueTracks)} total</span></div>
-                <div className="track-list">
-                {run.isMulti ? run.streams.map((stream) => <div className="track-row" key={stream.id}><span className="track-avatar"><Video size={14} /></span><div><strong>{stream.label}</strong><small>{number(stream.frames)} frames · peak {number(stream.peakCount)} people · {stream.detector}</small></div><div className="confidence"><strong>{number(stream.localTracks)}</strong><small>local IDs</small></div></div>) : run.tracks.length ? run.tracks.map((track) => <div className="track-row" key={track.id}><span className="track-avatar">{track.id}</span><div><strong>local-{track.id}</strong><small>Frames {track.firstFrame}–{track.lastFrame}</small></div><div className="confidence"><strong>{number(track.meanConfidence * 100, 0)}%</strong><small>confidence</small></div></div>) : <p className="muted">No tracked-person observations were recorded.</p>}
-                </div>
-                <div className="alert-box"><CircleAlert size={18} /><div><strong>{metrics.alertCount ? `${metrics.alertCount} crowd alert${metrics.alertCount === 1 ? "" : "s"}` : "No crowd alerts"}</strong><span>{metrics.alertCount ? "Zone threshold crossings are recorded below." : "Zone threshold was not exceeded in this run."}</span></div></div>
-                {run.isMulti && <section id="alerts" className="alert-history-panel"><span className="eyebrow">ZONE EVENT LOG</span><AlertHistory alerts={run.alerts} /></section>}
               </section>
             </div>
-
-            {!run.isMulti && <section className="card chart-card">
-              <div className="card-heading"><div><span className="eyebrow">FRAME-BY-FRAME ANALYSIS</span><h2>Observed people over time</h2><p>Unique local track IDs visible in each processed frame.</p></div><div className="chart-legend"><span><i className="legend-line" /> People detected</span><span><Clock3 size={15} /> Frame range: 0–{number(metrics.frames)}</span></div></div>
-              <OccupancyChart timeline={run.timeline} />
-              <div className="chart-labels"><span>Start</span><span>Peak: {number(metrics.peakCount)} people</span><span>End</span></div>
-            </section>}
-
-            <section className="card latency-card"><div className="card-heading"><div><span className="eyebrow">PIPELINE PROFILING</span><h2>Stage latency breakdown</h2><p>Measured during this completed run; values are per stage call.</p></div><span className="subtle-pill">milliseconds</span></div><LatencyProfile stages={run.latencyProfile} /></section>
-
-            <EvaluationResults evaluation={run.evaluation} />
-
-            <section className="development-row">
-              <article className="card development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></article>
-              <article className="card run-details"><span className="eyebrow">RUN DETAILS</span><dl><div><dt>Input</dt><dd>{metrics.source}</dd></div><div><dt>Last refresh</dt><dd>{refreshedAt ? refreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</dd></div></dl></article>
-            </section>
-
-            <TrainingProgress training={data.training} />
-
-            <FullMotBenchmark benchmark={data.benchmark} />
+            <SupportingWorkspace run={run} data={data} metrics={metrics} refreshedAt={refreshedAt} activePanel={activeWorkspace} onPanelChange={setActiveWorkspace} />
           </>}
         </div>
       </section>
