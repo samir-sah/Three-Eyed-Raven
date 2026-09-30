@@ -95,6 +95,24 @@ function readTrainingProgress() {
   };
 }
 
+function readLatestMotBenchmark() {
+  const summaries = findFiles(ARTIFACTS_ROOT, "benchmark_summary.json")
+    .map((file) => ({ file, modifiedAt: statSync(file).mtime }))
+    .sort((first, second) => second.modifiedAt - first.modifiedAt);
+  const latest = summaries[0];
+  if (!latest) return null;
+
+  const summary = safeJson(latest.file, null);
+  const aggregate = summary?.aggregate;
+  if (!aggregate) return null;
+  return {
+    label: `${summary.sequences?.length ?? 0} MOT17 sequences`,
+    updatedAt: latest.modifiedAt.toISOString(),
+    model: summary.model ?? "Unknown detector",
+    ...aggregate,
+  };
+}
+
 function readRun(runId) {
   const runDirectory = path.join(ARTIFACTS_ROOT, runId);
   const summaryPath = path.join(runDirectory, "summary.json");
@@ -271,7 +289,7 @@ function readMultiRun(runId) {
 
 export async function GET() {
   if (!existsSync(ARTIFACTS_ROOT)) {
-    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress() });
+    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress(), benchmark: null });
   }
 
   const runs = readdirSync(ARTIFACTS_ROOT, { withFileTypes: true })
@@ -283,5 +301,5 @@ export async function GET() {
     .filter(Boolean)
     .sort((first, second) => new Date(second.updatedAt) - new Date(first.updatedAt));
 
-  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress() });
+  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress(), benchmark: readLatestMotBenchmark() });
 }

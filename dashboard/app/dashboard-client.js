@@ -174,6 +174,15 @@ function TrainingProgress({ training }) {
   return <section className="card training-card"><div className="card-heading"><div><span className="eyebrow">MODEL DEVELOPMENT</span><h2>{label}</h2><p>{training.name} · {relativeTime(training.updatedAt)}</p></div><span className={training.status === "running" ? "training-status training-status-running" : "training-status"}>{training.status}</span></div><div className="training-progress"><div><strong>{number(training.currentEpoch)} / {number(training.totalEpochs || 0)} epochs</strong><span>{number(training.progress)}% complete</span></div><div className="training-track"><span style={{ width: `${training.progress}%` }} /></div></div>{metrics.length > 0 && <div className="training-metrics">{metrics.map(([name, value]) => <div key={name}><span>{name}</span><strong>{number(value * 100, 2)}%</strong></div>)}</div>}<p className="training-log">{training.lastLine}</p></section>;
 }
 
+function FullMotBenchmark({ benchmark }) {
+  if (!benchmark) return null;
+  const metrics = [
+    ["Precision", benchmark.precision], ["Recall", benchmark.recall], ["F1", benchmark.f1],
+    ["MOTA", benchmark.mota], ["MOTP", benchmark.motp], ["IDF1", benchmark.idf1], ["HOTA", benchmark.hota], ["ID switches", benchmark.id_switches],
+  ];
+  return <section className="card evaluation-card full-benchmark-card"><div className="card-heading"><div><span className="eyebrow">TRAINED-MODEL EVALUATION</span><h2>Full MOT17 benchmark</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} ground-truth boxes · {relativeTime(benchmark.updatedAt)}</p></div><span className="subtle-pill">Completed batch</span></div><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div><p className="benchmark-note">VisDrone-trained detector evaluated with ByteTrack. HOTA is the project’s internal comparison metric; verify with official TrackEval before publication.</p></section>;
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
@@ -256,6 +265,8 @@ export default function DashboardClient() {
             </div>
 
             <TrainingProgress training={data.training} />
+
+            <FullMotBenchmark benchmark={data.benchmark} />
 
             <div className="content-grid">
               <section className="card video-card">
