@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const ARTIFACTS_ROOT = path.resolve(process.cwd(), "..", "artifacts");
+const TRAINING_ROOT = path.resolve(process.cwd(), "..", "runs", "detect");
 
 function safeJson(filePath, fallback) {
   try {
@@ -35,6 +36,43 @@ function sampleTimeline(frameCounts) {
   return sampled.at(-1)?.frame === frameCounts.at(-1)?.frame
     ? sampled
     : [...sampled, frameCounts.at(-1)];
+}
+
+function findFiles(directory, name, found = []) {
+  if (!existsSync(directory)) return found;
+  for (const entry of readdirSync(directory, { withFileTypes: true })) {
+    const entryPath = path.join(directory, entry.name);
+    if (entry.isDirectory()) findFiles(entryPath, name, found);
+    else if (entry.isFile() && entry.name === name) found.push(entryPath);
+  }
+  return found;
+}
+
+function readTrainingProgress() {
+  const logs = findFiles(TRAINING_ROOT, "training.log")
+    .map((file) => ({ file, modifiedAt: statSync(file).mtime }))
+    .sort((first, second) => second.modifiedAt - first.modifiedAt);
+  const latest = logs[0];
+  if (!latest) return null;
+
+  const text = readFileSync(latest.file, "utf8");
+  const epochMatches = [...text.matchAll(/\s(\d+)\/(\d+)\s+\d+(?:\.\d+)?G/g)];
+  const epoch = epochMatches.at(-1);
+  const currentEpoch = epoch ? Number(epoch[1]) : 0;
+  const totalEpochs = epoch ? Number(epoch[2]) : 0;
+  const completed = /\d+ epochs completed in/.test(text);
+  const running = !completed && Date.now() - latest.modifiedAt.getTime() < 120000;
+  const lastLine = text.split(/\r?\n/).filter(Boolean).at(-1) ?? "Preparing dataset and model";
+
+  return {
+    name: path.basename(path.dirname(latest.file)).replaceAll("_", " "),
+    updatedAt: latest.modifiedAt.toISOString(),
+    currentEpoch: completed ? totalEpochs : currentEpoch,
+    totalEpochs,
+    progress: totalEpochs ? Math.round((completed ? totalEpochs : currentEpoch) / totalEpochs * 100) : 0,
+    status: completed ? "completed" : running ? "running" : "paused",
+    lastLine: lastLine.replace(/\x1B\[[0-?]*[ -\/]*[@-~]/g, "").slice(-180),
+  };
 }
 
 function readRun(runId) {
@@ -213,7 +251,7 @@ function readMultiRun(runId) {
 
 export async function GET() {
   if (!existsSync(ARTIFACTS_ROOT)) {
-    return Response.json({ runs: [], activeRun: null });
+    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress() });
   }
 
   const runs = readdirSync(ARTIFACTS_ROOT, { withFileTypes: true })
@@ -225,5 +263,5 @@ export async function GET() {
     .filter(Boolean)
     .sort((first, second) => new Date(second.updatedAt) - new Date(first.updatedAt));
 
-  return Response.json({ runs, activeRun: runs[0] ?? null });
+  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress() });
 }

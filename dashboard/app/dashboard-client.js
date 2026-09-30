@@ -167,6 +167,12 @@ function EvaluationResults({ evaluation }) {
   return <section className="card evaluation-card"><div className="card-heading"><div><span className="eyebrow">BENCHMARK EVALUATION</span><h2>Recorded tracking metrics</h2><p>IoU threshold {Math.round((evaluation.iou_threshold ?? 0.5) * 100)}% · Ground truth: {number(evaluation.ground_truth_boxes)} boxes</p></div><span className="subtle-pill">Measured baseline</span></div><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></section>;
 }
 
+function TrainingProgress({ training }) {
+  if (!training) return null;
+  const label = training.status === "running" ? "Training in progress" : training.status === "completed" ? "Training completed" : "Training update unavailable";
+  return <section className="card training-card"><div className="card-heading"><div><span className="eyebrow">MODEL DEVELOPMENT</span><h2>{label}</h2><p>{training.name} · {relativeTime(training.updatedAt)}</p></div><span className={training.status === "running" ? "training-status training-status-running" : "training-status"}>{training.status}</span></div><div className="training-progress"><div><strong>{number(training.currentEpoch)} / {number(training.totalEpochs || 0)} epochs</strong><span>{number(training.progress)}% complete</span></div><div className="training-track"><span style={{ width: `${training.progress}%` }} /></div></div><p className="training-log">{training.lastLine}</p></section>;
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
@@ -247,6 +253,8 @@ export default function DashboardClient() {
               <MetricCard icon={Gauge} label="Processing speed" value={`${number(metrics.processingFps, 2)} FPS`} note={`${number(metrics.duration, 1)} seconds of compute`} />
               <MetricCard icon={Cpu} label="Local track IDs" value={number(metrics.uniqueTracks)} note={`${number(metrics.averageConfidence * 100, 1)}% mean detection confidence`} />
             </div>
+
+            <TrainingProgress training={data.training} />
 
             <div className="content-grid">
               <section className="card video-card">
