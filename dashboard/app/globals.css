@@ -4,7 +4,7 @@
 :root { --ink: #181818; --muted: #747474; --line: #e7e7e7; --paper: #ffffff; --wash: #f8f8f8; --soft: #f3f3f3; }
 * { box-sizing: border-box; }
 html { background: var(--wash); }
-body { margin: 0; color: var(--ink); background: var(--wash); font-family: Montserrat, Arial, sans-serif; font-size: 14px; }
+body { margin: 0; color: var(--ink); background: var(--wash); font-family: "Google Sans", "Google Sans Text", Montserrat, Arial, sans-serif; font-size: 14px; }
 button, select { font: inherit; }
 button { cursor: pointer; }
 .shell { min-height: 100vh; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
