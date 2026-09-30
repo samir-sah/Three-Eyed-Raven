@@ -151,6 +151,8 @@ Each camera gets its own annotated video, observations, alerts, and summary unde
 
 The sample two-stream configuration includes a full-frame observation zone for each camera and a demo threshold of three local tracks. In a deployment, replace these rectangles and thresholds with site-specific zones after calibrating each camera view.
 
+The top-level `model` is the default detector for every camera. A camera can optionally provide its own `model` value when a measured domain difference justifies it—for example, a fine-tuned aerial detector for a drone feed and a general person detector for an uncalibrated ground feed. Each run summary records the detector used by each camera so the dashboard and evaluation remain auditable.
+
 The same run emits `reid_candidates.json`: an explainable HSV appearance-matching baseline that ranks possible cross-camera matches. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification. A trained aerial-ground Re-ID model is the next research upgrade after this baseline is evaluated.
 
 For a labeled aerial-ground dataset, evaluate exported query/gallery embeddings with standard Rank-1, Rank-5, Rank-10, and mAP metrics:

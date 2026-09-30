@@ -95,6 +95,7 @@ class CameraStreamConfig:
     id: str
     source: str
     zones: list[ZoneConfig] = field(default_factory=list)
+    model: str | None = None
 
     @classmethod
     def from_dict(cls, raw: dict) -> "CameraStreamConfig":
@@ -104,10 +105,14 @@ class CameraStreamConfig:
             raise ValueError("Each camera requires a non-empty string id.")
         if not isinstance(source, str) or not source.strip():
             raise ValueError(f"Camera '{identifier}' requires a source.")
+        model = raw.get("model")
+        if model is not None and (not isinstance(model, str) or not model.strip()):
+            raise ValueError(f"Camera '{identifier}' model must be a non-empty string when provided.")
         return cls(
             id=identifier,
             source=source,
             zones=[ZoneConfig.from_dict(zone) for zone in raw.get("zones", [])],
+            model=model,
         )
 
 
@@ -161,6 +166,11 @@ class MultiStreamConfig:
         camera_ids = [camera.id for camera in self.cameras]
         if len(camera_ids) != len(set(camera_ids)):
             raise ValueError("Camera ids must be unique.")
+        if any(
+            camera.model is not None and (not isinstance(camera.model, str) or not camera.model.strip())
+            for camera in self.cameras
+        ):
+            raise ValueError("Camera model overrides must be non-empty strings.")
         if not 0 < self.confidence_threshold <= 1:
             raise ValueError("confidence_threshold must be in (0, 1].")
         if not 0 < self.iou_threshold <= 1:

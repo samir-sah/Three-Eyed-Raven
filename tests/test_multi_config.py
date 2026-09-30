@@ -31,3 +31,19 @@ class MultiStreamConfigTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "reconnect_delay_seconds"):
             config.validate()
+
+    def test_accepts_camera_model_override(self):
+        camera = CameraStreamConfig.from_dict({"id": "cctv", "source": "ground.mp4", "model": "yolo11n.pt"})
+        self.assertEqual(camera.model, "yolo11n.pt")
+
+    def test_rejects_blank_camera_model_override(self):
+        with self.assertRaisesRegex(ValueError, "model"):
+            CameraStreamConfig.from_dict({"id": "cctv", "source": "ground.mp4", "model": ""})
+
+    def test_rejects_non_string_camera_model_override(self):
+        config = MultiStreamConfig(
+            output_dir="artifacts/two_stream_demo",
+            cameras=[CameraStreamConfig(id="a", source="a.mp4"), CameraStreamConfig(id="b", source="b.mp4", model=42)],
+        )
+        with self.assertRaisesRegex(ValueError, "model"):
+            config.validate()

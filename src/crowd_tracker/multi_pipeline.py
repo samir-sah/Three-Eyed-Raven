@@ -24,6 +24,7 @@ class _CameraState:
     config: CameraStreamConfig
     capture: cv2.VideoCapture
     tracker: ByteTrackPersonTracker
+    model_path: str
     analytics: ZoneAnalytics
     output_dir: Path
     observations_file: object
@@ -128,12 +129,13 @@ class MultiStreamPipeline:
             config=camera,
             capture=capture,
             tracker=ByteTrackPersonTracker(
-                model_path=self.config.model,
+                model_path=camera.model or self.config.model,
                 device=self.config.device,
                 confidence=self.config.confidence_threshold,
                 iou=self.config.iou_threshold,
                 tracker=self.config.tracker,
             ),
+            model_path=camera.model or self.config.model,
             analytics=ZoneAnalytics(camera.zones),
             output_dir=output_dir,
             observations_file=(output_dir / "observations.jsonl").open("w", encoding="utf-8"),
@@ -218,6 +220,7 @@ class MultiStreamPipeline:
         summary = {
             "camera_id": state.config.id,
             "source": state.config.source,
+            "model": state.model_path,
             "source_fps": state.source_fps,
             "source_resolution": [state.source_width, state.source_height],
             "frames_read": state.read,

@@ -18,6 +18,7 @@ function safeJson(filePath, fallback) {
 function detectorLabel(modelPath) {
   if (!modelPath) return "Detector not recorded";
   if (String(modelPath).includes("visdrone_person")) return "VisDrone fine-tuned YOLO11n";
+  if (path.basename(String(modelPath)) === "yolo11n.pt") return "YOLO11n (COCO)";
   return path.basename(String(modelPath));
 }
 
@@ -204,6 +205,7 @@ function readMultiRun(runId) {
   const summaryPath = path.join(runDirectory, "summary.json");
   const summary = safeJson(summaryPath, {});
   const reidReport = safeJson(path.join(runDirectory, "reid_candidates.json"), { summary: {}, candidates: [] });
+  const fallbackModel = summary.config?.model;
   const streams = (summary.cameras ?? []).map((camera) => {
     const cameraDirectory = path.join(runDirectory, camera.camera_id);
     const observations = readJsonLines(path.join(cameraDirectory, "observations.jsonl"));
@@ -230,6 +232,7 @@ function readMultiRun(runId) {
     return {
       id: camera.camera_id,
       label: camera.camera_id.startsWith("aerial") ? "Aerial / drone view" : "Ground / CCTV view",
+      detector: detectorLabel(camera.model ?? fallbackModel),
       previewFrames,
       source: camera.source,
       frames: camera.frames_processed,
@@ -241,6 +244,7 @@ function readMultiRun(runId) {
       alerts: alerts.slice(-5).reverse(),
     };
   });
+  const detectorLabels = [...new Set(streams.map((stream) => stream.detector))];
   const observationWeight = streams.reduce((total, stream) => total + stream.frames, 0) || 1;
   const busiestStream = streams.reduce((best, stream) => (stream.peakCount > best.peakCount ? stream : best), { peakCount: 0, peakFrame: 0 });
   const alerts = streams
@@ -266,7 +270,7 @@ function readMultiRun(runId) {
     isMulti: true,
     updatedAt: statSync(summaryPath).mtime.toISOString(),
     hasVideo: streams.some((stream) => stream.previewFrames.length),
-    detector: detectorLabel(summary.config?.model),
+    detector: detectorLabels.length === 1 ? detectorLabels[0] : "Per-camera detector policy",
     streams,
     reid: {
       method: reidReport.summary?.method ?? "Not generated yet",
