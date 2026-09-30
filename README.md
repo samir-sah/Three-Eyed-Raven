@@ -69,6 +69,8 @@ python -m uvicorn crowd_tracker.api:app --host 127.0.0.1 --port 8000
 
 Open `http://127.0.0.1:8000/docs` for interactive API documentation. Available endpoints are `GET /health`, `GET /runs`, and `GET /runs/{run_id}`. Set `CROWD_TRACKER_ARTIFACTS` to use a different artifact directory.
 
+When the service is running on its default local address, the Next.js dashboard displays its live service status. Set `TRACKER_API_URL` before starting the dashboard if the API is hosted elsewhere.
+
 ## Next implementation steps
 
 1. Evaluate detection and tracking on VisDrone/MOT17 rather than relying on a visual demo.

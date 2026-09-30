@@ -155,6 +155,7 @@ function AlertHistory({ alerts }) {
 
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
+  const [service, setService] = useState({ available: false, runCount: 0 });
   const [selectedRun, setSelectedRun] = useState("");
   const [loading, setLoading] = useState(true);
   const [refreshedAt, setRefreshedAt] = useState(null);
@@ -162,9 +163,13 @@ export default function DashboardClient() {
   async function loadDashboard() {
     setLoading(true);
     try {
-      const response = await fetch("/api/dashboard", { cache: "no-store" });
-      const next = await response.json();
+      const [dashboardResponse, serviceResponse] = await Promise.all([
+        fetch("/api/dashboard", { cache: "no-store" }),
+        fetch("/api/service-health", { cache: "no-store" }),
+      ]);
+      const next = await dashboardResponse.json();
       setData(next);
+      if (serviceResponse.ok) setService(await serviceResponse.json());
       setSelectedRun((current) => current || next.activeRun?.id || "");
       setRefreshedAt(new Date());
     } finally {
@@ -207,12 +212,13 @@ export default function DashboardClient() {
       <section className="app-area">
         <header className="topbar">
           <button className="icon-button mobile-menu" aria-label="Open menu"><Menu size={20} /></button>
-          <div className="project-switch"><span className="status-dot" /> Crowd Intelligence <ChevronDown size={16} /></div>
+          <div className="project-switch"><span className={service.available ? "status-dot status-dot-online" : "status-dot"} /> Crowd Intelligence <ChevronDown size={16} /></div>
           <div className="top-actions"><span className="demo-mode">Panel demo</span><button className="icon-button"><Bell size={19} /><i /></button><button className="icon-button"><ShieldCheck size={19} /></button></div>
         </header>
 
-        <div className="content">
-          <div className="page-heading">
+          <div className="content">
+            <div className={service.available ? "service-status service-status-online" : "service-status"}><span>{service.available ? "Run service online" : "Run service unavailable"}</span><small>{service.available ? `${number(service.runCount)} completed run${service.runCount === 1 ? "" : "s"} exposed by FastAPI` : "Dashboard is reading local artifacts directly"}</small></div>
+            <div className="page-heading">
             <div><span className="eyebrow">SURVEILLANCE ANALYTICS</span><h1>Dashboard</h1><p>{relativeTime(run?.updatedAt)}</p></div>
             <div className="heading-actions">
               <label className="run-select"><Radio size={17} /><select value={run?.id ?? ""} onChange={(event) => setSelectedRun(event.target.value)}>{data.runs.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><ChevronDown size={16} /></label>
