@@ -132,6 +132,18 @@ function MultiStreamPlayer({ streams }) {
   );
 }
 
+function ReIdCandidates({ reid }) {
+  const candidates = reid?.candidates ?? [];
+  return (
+    <section className="reid-panel">
+      <div className="reid-heading"><div><span className="eyebrow">CROSS-CAMERA RE-ID</span><h3>Appearance review candidates</h3></div><span className="subtle-pill">{reid?.reviewCandidates ?? 0} above threshold</span></div>
+      <p className="reid-method">Method: {reid?.method ?? "Not generated"}{reid?.candidateThreshold ? ` · review threshold ${Math.round(reid.candidateThreshold * 100)}%` : ""}</p>
+      {candidates.length ? <div className="candidate-list">{candidates.map((candidate, index) => <div className="candidate-row" key={`${candidate.probe_camera_id}-${candidate.probe_track_id}-${candidate.gallery_camera_id}-${candidate.gallery_track_id}-${index}`}><div><strong>{candidate.probe_camera_id}/local-{candidate.probe_track_id}</strong><span>↔ {candidate.gallery_camera_id}/local-{candidate.gallery_track_id}</span></div><div className={candidate.status === "review" ? "candidate-score candidate-review" : "candidate-score"}><strong>{Math.round(candidate.similarity * 100)}%</strong><small>{candidate.status === "review" ? "manual review" : "below threshold"}</small></div></div>)}</div> : <div className="reid-empty">No candidates have been generated yet. Run the updated two-stream pipeline to populate this panel.</div>}
+      <p className="reid-warning"><CircleAlert size={14} /> {reid?.warning}</p>
+    </section>
+  );
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [selectedRun, setSelectedRun] = useState("");
@@ -212,6 +224,7 @@ export default function DashboardClient() {
                 <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2></div><span className="live-badge"><span /> Recorded run</span></div>
                 {run.hasVideo ? (run.isMulti ? <MultiStreamPlayer streams={run.streams} /> : <FramePlayer frames={run.previewFrames} videoUrl={run.videoUrl} />) : <EmptyState />}
                 <div className="video-footer"><span><CheckCircle2 size={16} /> {run.isMulti ? "Both feeds processed with independent local trackers" : "Detection & local tracking completed"}</span>{!run.isMulti && <a href={run.videoUrl} download><Download size={16} /> Download MP4</a>}</div>
+                {run.isMulti && <ReIdCandidates reid={run.reid} />}
               </section>
 
               <section className="card tracks-card">

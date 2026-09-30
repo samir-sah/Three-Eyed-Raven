@@ -117,6 +117,7 @@ function readMultiRun(runId) {
   const runDirectory = path.join(ARTIFACTS_ROOT, runId);
   const summaryPath = path.join(runDirectory, "summary.json");
   const summary = safeJson(summaryPath, {});
+  const reidReport = safeJson(path.join(runDirectory, "reid_candidates.json"), { summary: {}, candidates: [] });
   const streams = (summary.cameras ?? []).map((camera) => {
     const cameraDirectory = path.join(runDirectory, camera.camera_id);
     const observations = readJsonLines(path.join(cameraDirectory, "observations.jsonl"));
@@ -162,6 +163,13 @@ function readMultiRun(runId) {
     updatedAt: statSync(summaryPath).mtime.toISOString(),
     hasVideo: streams.some((stream) => stream.previewFrames.length),
     streams,
+    reid: {
+      method: reidReport.summary?.method ?? "Not generated yet",
+      candidateThreshold: reidReport.summary?.candidate_threshold ?? null,
+      reviewCandidates: reidReport.summary?.review_candidates ?? 0,
+      warning: reidReport.summary?.warning ?? "Run the updated two-stream pipeline to generate review candidates.",
+      candidates: (reidReport.candidates ?? []).slice(0, 6),
+    },
     metrics: {
       frames: summary.total_frames_processed ?? 0,
       processingFps: summary.aggregate_processing_fps ?? 0,

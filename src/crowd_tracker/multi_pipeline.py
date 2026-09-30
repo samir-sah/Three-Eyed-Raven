@@ -13,6 +13,7 @@ import cv2
 from .analytics import ZoneAnalytics
 from .config import CameraStreamConfig, MultiStreamConfig
 from .models import TrackObservation
+from .reid import AppearanceGallery, CrossCameraMatcher
 from .tracker import ByteTrackPersonTracker, TrackedPerson
 
 
@@ -42,6 +43,14 @@ class MultiStreamPipeline:
         self.config = config
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.gallery = AppearanceGallery(
+            min_box_size=config.reid_min_box_size,
+            max_samples_per_track=6,
+        )
+        self.matcher = CrossCameraMatcher(
+            candidate_threshold=config.reid_candidate_threshold,
+            top_k=config.reid_top_k,
+        )
 
     def run(self) -> dict:
         states = [self._open_camera(camera) for camera in self.config.cameras]
@@ -61,12 +70,25 @@ class MultiStreamPipeline:
 
         elapsed = max(time.perf_counter() - started, 1e-9)
         cameras = [self._camera_summary(state, elapsed) for state in states]
+        candidates = self.matcher.rank(self.gallery.descriptors())
+        reid_summary = {
+            "method": "HSV appearance baseline",
+            "candidate_threshold": self.config.reid_candidate_threshold,
+            "review_candidates": sum(candidate["status"] == "review" for candidate in candidates),
+            "ranked_pairs": len(candidates),
+            "warning": "Appearance similarity is not identity verification. Review candidates manually; do not use this output for decisions about people.",
+        }
+        (self.output_dir / "reid_candidates.json").write_text(
+            json.dumps({"summary": reid_summary, "candidates": candidates}, indent=2),
+            encoding="utf-8",
+        )
         summary = {
             "run_type": "multi_stream",
             "elapsed_seconds": round(elapsed, 3),
             "total_frames_processed": sum(camera["frames_processed"] for camera in cameras),
             "aggregate_processing_fps": round(sum(camera["frames_processed"] for camera in cameras) / elapsed, 3),
             "cameras": cameras,
+            "reid": reid_summary,
             "config": self.config.as_dict(),
         }
         (self.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -127,6 +149,7 @@ class MultiStreamPipeline:
         state.unique_track_ids.update(item.track_id for item in observations)
         for observation in observations:
             state.observations_file.write(json.dumps(observation.as_dict()) + "\n")
+            self.gallery.add(frame, observation)
 
         alerts = state.analytics.alerts(observations)
         for alert in alerts:

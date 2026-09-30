@@ -65,6 +65,8 @@ python -m crowd_tracker.multi_cli --config multi_config.json
 
 Each camera gets its own annotated video, observations, alerts, and summary under `artifacts/two_stream_demo`.
 
+The same run emits `reid_candidates.json`: an explainable HSV appearance-matching baseline that ranks possible cross-camera matches. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification. A trained aerial-ground Re-ID model is the next research upgrade after this baseline is evaluated.
+
 ## Dashboard preview frames
 
 The annotated MP4 is created with OpenCV's FMP4 codec, which some browsers cannot play. Generate a browser-safe frame sequence for the Next.js dashboard with:

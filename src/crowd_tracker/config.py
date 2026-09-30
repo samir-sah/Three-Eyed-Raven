@@ -115,6 +115,9 @@ class MultiStreamConfig:
     max_frames_per_camera: int | None = None
     save_video: bool = True
     tracker: str = "bytetrack.yaml"
+    reid_candidate_threshold: float = 0.72
+    reid_top_k: int = 3
+    reid_min_box_size: int = 32
 
     @classmethod
     def from_file(cls, path: str | Path) -> "MultiStreamConfig":
@@ -131,6 +134,9 @@ class MultiStreamConfig:
             max_frames_per_camera=raw.get("max_frames_per_camera"),
             save_video=raw.get("save_video", True),
             tracker=raw.get("tracker", "bytetrack.yaml"),
+            reid_candidate_threshold=raw.get("reid_candidate_threshold", 0.72),
+            reid_top_k=raw.get("reid_top_k", 3),
+            reid_min_box_size=raw.get("reid_min_box_size", 32),
         )
         config.validate()
         return config
@@ -151,6 +157,12 @@ class MultiStreamConfig:
             raise ValueError("frame_stride must be >= 1.")
         if self.max_frames_per_camera is not None and self.max_frames_per_camera < 1:
             raise ValueError("max_frames_per_camera must be null or >= 1.")
+        if not 0 < self.reid_candidate_threshold <= 1:
+            raise ValueError("reid_candidate_threshold must be in (0, 1].")
+        if self.reid_top_k < 1:
+            raise ValueError("reid_top_k must be >= 1.")
+        if self.reid_min_box_size < 8:
+            raise ValueError("reid_min_box_size must be >= 8.")
 
     def as_dict(self) -> dict:
         return asdict(self)
