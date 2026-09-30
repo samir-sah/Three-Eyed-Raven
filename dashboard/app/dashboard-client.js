@@ -300,10 +300,6 @@ export default function DashboardClient() {
               <MetricCard icon={Cpu} label="Local trajectory IDs" value={number(metrics.uniqueTracks)} note={run.isMulti ? "Camera-local lifetime IDs, not people" : `${number(metrics.averageConfidence * 100, 1)}% mean detection confidence`} />
             </div>
 
-            <TrainingProgress training={data.training} />
-
-            <FullMotBenchmark benchmark={data.benchmark} />
-
             <div className="content-grid">
               <section id="video-runs" className="card video-card">
                 <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2><p>{run.detector ?? "Detector not recorded"}</p></div><span className="live-badge"><span /> Recorded run</span></div>
@@ -336,6 +332,10 @@ export default function DashboardClient() {
               <article className="card development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></article>
               <article className="card run-details"><span className="eyebrow">RUN DETAILS</span><dl><div><dt>Input</dt><dd>{metrics.source}</dd></div><div><dt>Last refresh</dt><dd>{refreshedAt ? refreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</dd></div></dl></article>
             </section>
+
+            <TrainingProgress training={data.training} />
+
+            <FullMotBenchmark benchmark={data.benchmark} />
           </>}
         </div>
       </section>
