@@ -270,7 +270,7 @@ export default function DashboardClient() {
 
             <div className="content-grid">
               <section className="card video-card">
-                <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2></div><span className="live-badge"><span /> Recorded run</span></div>
+                <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2><p>{run.detector ?? "Detector not recorded"}</p></div><span className="live-badge"><span /> Recorded run</span></div>
                 {run.hasVideo ? (run.isMulti ? <MultiStreamPlayer streams={run.streams} /> : <FramePlayer frames={run.previewFrames} videoUrl={run.videoUrl} />) : <EmptyState />}
                 <div className="video-footer"><span><CheckCircle2 size={16} /> {run.isMulti ? "Both feeds processed with independent local trackers" : "Detection & local tracking completed"}</span>{!run.isMulti && <a href={run.videoUrl} download><Download size={16} /> Download MP4</a>}</div>
                 {run.isMulti && <ReIdCandidates reid={run.reid} />}

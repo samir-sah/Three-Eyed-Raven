@@ -15,6 +15,12 @@ function safeJson(filePath, fallback) {
   }
 }
 
+function detectorLabel(modelPath) {
+  if (!modelPath) return "Detector not recorded";
+  if (String(modelPath).includes("visdrone_person")) return "VisDrone fine-tuned YOLO11n";
+  return path.basename(String(modelPath));
+}
+
 function readJsonLines(filePath) {
   if (!existsSync(filePath)) return [];
   return readFileSync(filePath, "utf8")
@@ -172,6 +178,7 @@ function readRun(runId) {
     hasVideo: existsSync(videoPath),
     videoUrl: `/api/artifacts/${encodeURIComponent(runId)}/annotated.mp4`,
     previewFrames,
+    detector: detectorLabel(summary.config?.model),
     metrics: {
       frames: summary.frames_processed ?? 0,
       processingFps: summary.processing_fps ?? 0,
