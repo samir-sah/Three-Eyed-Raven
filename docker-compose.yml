@@ -1,0 +1,24 @@
+services:
+  api:
+    build:
+      context: .
+    environment:
+      CROWD_TRACKER_ARTIFACTS: /artifacts
+      CROWD_TRACKER_DB: /artifacts/runs.sqlite3
+      CROWD_TRACKER_API_KEY: ${CROWD_TRACKER_API_KEY:-}
+    volumes:
+      - ./artifacts:/artifacts
+    ports:
+      - "8000:8000"
+
+  dashboard:
+    build:
+      context: ./dashboard
+    environment:
+      TRACKER_API_URL: http://api:8000
+    depends_on:
+      - api
+    volumes:
+      - ./artifacts:/artifacts:ro
+    ports:
+      - "3000:3000"

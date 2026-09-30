@@ -202,10 +202,10 @@ export default function DashboardClient() {
         </nav>
         <div className="sidebar-foot card">
           <span className="eyebrow">PROJECT STATUS</span>
-          <strong>Baseline validated</strong>
-          <p>Single aerial feed, GPU inference, local IDs, and artifact logging are working.</p>
-          <div className="progress-track"><span /></div>
-          <small>Phase 1 of 4</small>
+          <strong>Prototype validated</strong>
+          <p>Multi-camera tracking, review-only Re-ID, alerting, API persistence, and evaluation tooling are working.</p>
+          <div className="progress-track"><span className="progress-75" /></div>
+          <small>Phase 3 of 4 · field validation next</small>
         </div>
       </aside>
 
@@ -259,7 +259,7 @@ export default function DashboardClient() {
             </section>
 
             <section className="development-row">
-              <article className="card development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="current"><Activity size={16} /> Crowd analytics</span><span><Radio size={16} /> Cross-view Re-ID</span></div></article>
+              <article className="card development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></article>
               <article className="card run-details"><span className="eyebrow">RUN DETAILS</span><dl><div><dt>Input</dt><dd>{metrics.source}</dd></div><div><dt>Last refresh</dt><dd>{refreshedAt ? refreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</dd></div></dl></article>
             </section>
           </>}

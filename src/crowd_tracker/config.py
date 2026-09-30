@@ -39,6 +39,8 @@ class AppConfig:
     display: bool = False
     save_video: bool = True
     tracker: str = "bytetrack.yaml"
+    reconnect_attempts: int = 3
+    reconnect_delay_seconds: float = 2.0
     zones: list[ZoneConfig] = field(default_factory=list)
 
     @classmethod
@@ -58,6 +60,8 @@ class AppConfig:
             display=raw.get("display", False),
             save_video=raw.get("save_video", True),
             tracker=raw.get("tracker", "bytetrack.yaml"),
+            reconnect_attempts=raw.get("reconnect_attempts", 3),
+            reconnect_delay_seconds=raw.get("reconnect_delay_seconds", 2.0),
             zones=[ZoneConfig.from_dict(zone) for zone in raw.get("zones", [])],
         )
         config.validate()
@@ -74,6 +78,10 @@ class AppConfig:
             raise ValueError("frame_stride must be >= 1.")
         if self.max_frames is not None and self.max_frames < 1:
             raise ValueError("max_frames must be null or >= 1.")
+        if self.reconnect_attempts < 0:
+            raise ValueError("reconnect_attempts must be >= 0.")
+        if self.reconnect_delay_seconds < 0:
+            raise ValueError("reconnect_delay_seconds must be >= 0.")
         zone_ids = [zone.id for zone in self.zones]
         if len(zone_ids) != len(set(zone_ids)):
             raise ValueError("Zone ids must be unique.")
@@ -118,6 +126,8 @@ class MultiStreamConfig:
     reid_candidate_threshold: float = 0.72
     reid_top_k: int = 3
     reid_min_box_size: int = 32
+    reconnect_attempts: int = 3
+    reconnect_delay_seconds: float = 2.0
 
     @classmethod
     def from_file(cls, path: str | Path) -> "MultiStreamConfig":
@@ -137,6 +147,8 @@ class MultiStreamConfig:
             reid_candidate_threshold=raw.get("reid_candidate_threshold", 0.72),
             reid_top_k=raw.get("reid_top_k", 3),
             reid_min_box_size=raw.get("reid_min_box_size", 32),
+            reconnect_attempts=raw.get("reconnect_attempts", 3),
+            reconnect_delay_seconds=raw.get("reconnect_delay_seconds", 2.0),
         )
         config.validate()
         return config
@@ -163,6 +175,10 @@ class MultiStreamConfig:
             raise ValueError("reid_top_k must be >= 1.")
         if self.reid_min_box_size < 8:
             raise ValueError("reid_min_box_size must be >= 8.")
+        if self.reconnect_attempts < 0:
+            raise ValueError("reconnect_attempts must be >= 0.")
+        if self.reconnect_delay_seconds < 0:
+            raise ValueError("reconnect_delay_seconds must be >= 0.")
 
     def as_dict(self) -> dict:
         return asdict(self)

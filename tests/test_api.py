@@ -35,3 +35,10 @@ class ApiTests(unittest.TestCase):
             client = TestClient(create_app(Path(temporary)))
             self.assertEqual(client.get("/runs/missing").status_code, 404)
             self.assertEqual(client.get("/runs/..%2Fsecret").status_code, 404)
+
+    def test_run_endpoints_accept_a_configured_api_key_only(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            client = TestClient(create_app(Path(temporary), api_key="panel-secret"))
+            self.assertEqual(client.get("/runs").status_code, 401)
+            self.assertEqual(client.get("/runs", headers={"X-API-Key": "panel-secret"}).status_code, 200)
+            self.assertEqual(client.get("/history", headers={"X-API-Key": "panel-secret"}).status_code, 200)

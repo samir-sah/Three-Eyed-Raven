@@ -15,6 +15,7 @@ from .config import CameraStreamConfig, MultiStreamConfig
 from .models import TrackObservation
 from .reid import AppearanceGallery, CrossCameraMatcher
 from .tracker import ByteTrackPersonTracker, TrackedPerson
+from .storage import RunStore
 
 
 @dataclass
@@ -33,6 +34,8 @@ class _CameraState:
     read: int = 0
     processed: int = 0
     finished: bool = False
+    reconnects: int = 0
+    alert_count: int = 0
     unique_track_ids: set[int] = field(default_factory=set)
 
 
@@ -88,12 +91,14 @@ class MultiStreamPipeline:
             "elapsed_seconds": round(elapsed, 3),
             "total_frames_processed": sum(camera["frames_processed"] for camera in cameras),
             "aggregate_processing_fps": round(sum(camera["frames_processed"] for camera in cameras) / elapsed, 3),
+            "alert_count": sum(camera["alert_count"] for camera in cameras),
             "cameras": cameras,
             "reid": reid_summary,
             "config": self.config.as_dict(),
         }
         (self.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         (self.output_dir / "manifest.json").write_text(json.dumps({"cameras": cameras}, indent=2), encoding="utf-8")
+        RunStore.for_output_dir(self.output_dir).upsert(self.output_dir.name, self.output_dir, summary)
         return summary
 
     def _open_camera(self, camera: CameraStreamConfig) -> _CameraState:
@@ -138,6 +143,13 @@ class MultiStreamPipeline:
     def _process_next_frame(self, state: _CameraState) -> None:
         ok, frame = state.capture.read()
         if not ok:
+            if _is_live_source(state.config.source) and state.reconnects < self.config.reconnect_attempts:
+                state.reconnects += 1
+                state.capture.release()
+                time.sleep(self.config.reconnect_delay_seconds)
+                state.capture = cv2.VideoCapture(state.config.source)
+                if state.capture.isOpened():
+                    return
             state.finished = True
             return
         state.read += 1
@@ -155,6 +167,7 @@ class MultiStreamPipeline:
         alerts = state.analytics.alerts(observations)
         for alert in alerts:
             state.alerts_file.write(json.dumps(alert.as_dict()) + "\n")
+        state.alert_count += len(alerts)
 
         self._draw(state, frame, tracked, observations, alerts)
         if state.writer is not None:
@@ -203,7 +216,13 @@ class MultiStreamPipeline:
             "frames_read": state.read,
             "frames_processed": state.processed,
             "unique_local_track_ids": len(state.unique_track_ids),
+            "alert_count": state.alert_count,
+            "reconnects": state.reconnects,
             "processing_fps": round(state.processed / elapsed, 3),
         }
         (state.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
         return summary
+
+
+def _is_live_source(source: str) -> bool:
+    return source.lower().startswith(("rtsp://", "rtsps://", "http://", "https://"))

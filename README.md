@@ -67,9 +67,52 @@ set PYTHONPATH=src
 python -m uvicorn crowd_tracker.api:app --host 127.0.0.1 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/docs` for interactive API documentation. Available endpoints are `GET /health`, `GET /runs`, and `GET /runs/{run_id}`. Set `CROWD_TRACKER_ARTIFACTS` to use a different artifact directory.
+Open `http://127.0.0.1:8000/docs` for interactive API documentation. Available endpoints are `GET /health`, `GET /runs`, `GET /runs/{run_id}`, and `GET /history`. Set `CROWD_TRACKER_ARTIFACTS` to use a different artifact directory.
 
 When the service is running on its default local address, the Next.js dashboard displays its live service status. Set `TRACKER_API_URL` before starting the dashboard if the API is hosted elsewhere.
+
+Set `CROWD_TRACKER_API_KEY` before making the service available to any other device. This protects all run-data endpoints with the `X-API-Key` header; `/health` stays unprotected for service monitoring.
+
+## Live camera integration
+
+`source` accepts a local file or an RTSP/HTTP stream URL supported by OpenCV. For a live source, set `max_frames` (or `max_frames_per_camera`) to `null`, use `save_video: false` unless recording is required, and tune the bounded reconnect settings:
+
+```json
+{
+  "source": "rtsp://camera-host:554/stream",
+  "reconnect_attempts": 3,
+  "reconnect_delay_seconds": 2.0
+}
+```
+
+The tracker makes only the configured number of reconnect attempts and then completes the run with reconnect metadata. Do not place credentials in committed configuration files; keep private stream URLs in ignored `config.json` or environment-managed configuration.
+
+## Dataset preparation
+
+Convert MOTChallenge `gt.txt` labels into the evaluator's JSONL format, then compare them with this project's `observations.jsonl` output:
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.mot_import_cli --input path\to\gt.txt --output artifacts\ground_truth.jsonl
+python -m crowd_tracker.tracking_eval_cli --ground-truth artifacts\ground_truth.jsonl --predictions artifacts\your_run\observations.jsonl
+```
+
+## Persistence and containers
+
+Every completed run is indexed in `artifacts/runs.sqlite3`. Index existing artifacts once after upgrading:
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.index_runs_cli --artifacts artifacts
+```
+
+For a local container deployment (CPU by default), create a `.env` file with `CROWD_TRACKER_API_KEY=your-long-random-value` and run:
+
+```bat
+docker compose up --build
+```
+
+The compose setup exposes the dashboard on port 3000 and API on port 8000. GPU-enabled Docker deployment needs the NVIDIA Container Toolkit and an appropriate CUDA-enabled image; validate that separately before claiming real-time performance in a container.
 
 ## Next implementation steps
 

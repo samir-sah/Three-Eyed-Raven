@@ -10,6 +10,8 @@
   "display": false,
   "save_video": true,
   "tracker": "bytetrack.yaml",
+  "reconnect_attempts": 3,
+  "reconnect_delay_seconds": 2.0,
   "zones": [
     {
       "id": "gate_a",

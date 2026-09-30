@@ -9,10 +9,14 @@ from __future__ import annotations
 import json
 import os
 import re
+import secrets
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException
+from fastapi import Depends, FastAPI, HTTPException, Security
+from fastapi.security import APIKeyHeader
+
+from .storage import RunStore
 
 
 _SAFE_RUN_ID = re.compile(r"^[A-Za-z0-9_-]+$")
@@ -85,25 +89,35 @@ class ArtifactRepository:
             return []
 
 
-def create_app(artifacts_root: Path | None = None) -> FastAPI:
+def create_app(artifacts_root: Path | None = None, api_key: str | None = None) -> FastAPI:
     root = artifacts_root or Path(os.environ.get("CROWD_TRACKER_ARTIFACTS", "artifacts"))
     repository = ArtifactRepository(root)
+    configured_key = api_key if api_key is not None else os.environ.get("CROWD_TRACKER_API_KEY")
+    key_header = APIKeyHeader(name="X-API-Key", auto_error=False)
     app = FastAPI(title="Three Eyed Raven Run Service", version="0.1.0")
+
+    def require_api_key(value: str | None = Security(key_header)) -> None:
+        if configured_key and not (value and secrets.compare_digest(value, configured_key)):
+            raise HTTPException(status_code=401, detail="Valid X-API-Key required")
 
     @app.get("/health")
     def health() -> dict[str, Any]:
         return {"status": "ok", "artifacts_root": str(repository.root), "run_count": len(repository.list_runs())}
 
-    @app.get("/runs")
+    @app.get("/runs", dependencies=[Depends(require_api_key)])
     def runs() -> dict[str, list[dict[str, Any]]]:
         return {"runs": repository.list_runs()}
 
-    @app.get("/runs/{run_id}")
+    @app.get("/runs/{run_id}", dependencies=[Depends(require_api_key)])
     def run_detail(run_id: str) -> dict[str, Any]:
         run = repository.read_run(run_id)
         if run is None:
             raise HTTPException(status_code=404, detail="Run not found")
         return run
+
+    @app.get("/history", dependencies=[Depends(require_api_key)])
+    def history() -> dict[str, list[dict[str, Any]]]:
+        return {"runs": RunStore.for_output_dir(root / "placeholder").list_runs()}
 
     return app
 

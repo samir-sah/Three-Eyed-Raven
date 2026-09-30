@@ -12,6 +12,7 @@ import cv2
 from .analytics import ZoneAnalytics
 from .config import AppConfig
 from .models import TrackObservation
+from .storage import RunStore
 from .tracker import ByteTrackPersonTracker, TrackedPerson
 
 
@@ -47,6 +48,8 @@ class OfflinePipeline:
         processed = 0
         read = 0
         unique_track_ids: set[int] = set()
+        alert_count = 0
+        reconnects = 0
         started = time.perf_counter()
 
         try:
@@ -54,6 +57,13 @@ class OfflinePipeline:
                 while True:
                     ok, frame = capture.read()
                     if not ok:
+                        if _is_live_source(self.config.source) and reconnects < self.config.reconnect_attempts:
+                            reconnects += 1
+                            capture.release()
+                            time.sleep(self.config.reconnect_delay_seconds)
+                            capture = cv2.VideoCapture(self.config.source)
+                            if capture.isOpened():
+                                continue
                         break
                     read += 1
                     if read % self.config.frame_stride != 0:
@@ -68,6 +78,7 @@ class OfflinePipeline:
                     alerts = self.analytics.alerts(observations)
                     for alert in alerts:
                         alert_file.write(json.dumps(alert.as_dict()) + "\n")
+                    alert_count += len(alerts)
 
                     self._draw(frame, tracked, observations, alerts)
                     if writer is not None:
@@ -89,6 +100,7 @@ class OfflinePipeline:
 
         elapsed = max(time.perf_counter() - started, 1e-9)
         summary = {
+            "run_type": "single_stream",
             "source": self.config.source,
             "source_fps": source_fps,
             "source_resolution": [source_width, source_height],
@@ -97,9 +109,12 @@ class OfflinePipeline:
             "elapsed_seconds": round(elapsed, 3),
             "processing_fps": round(processed / elapsed, 3),
             "unique_local_track_ids": len(unique_track_ids),
+            "alert_count": alert_count,
+            "reconnects": reconnects,
             "config": self.config.as_dict(),
         }
         (self.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
+        RunStore.for_output_dir(self.output_dir).upsert(self.output_dir.name, self.output_dir, summary)
         return summary
 
     def _create_writer(self, fps: float, width: int, height: int):
@@ -156,3 +171,7 @@ class OfflinePipeline:
                 (0, 0, 255),
                 2,
             )
+
+
+def _is_live_source(source: str) -> bool:
+    return source.lower().startswith(("rtsp://", "rtsps://", "http://", "https://"))

@@ -22,3 +22,12 @@ class MultiStreamConfigTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "unique"):
             config.validate()
+
+    def test_rejects_negative_reconnect_delay(self):
+        config = MultiStreamConfig(
+            output_dir="artifacts/two_stream_demo",
+            cameras=[CameraStreamConfig(id="a", source="a.mp4"), CameraStreamConfig(id="b", source="b.mp4")],
+            reconnect_delay_seconds=-1,
+        )
+        with self.assertRaisesRegex(ValueError, "reconnect_delay_seconds"):
+            config.validate()

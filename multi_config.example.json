@@ -11,6 +11,8 @@
   "reid_candidate_threshold": 0.72,
   "reid_top_k": 3,
   "reid_min_box_size": 32,
+  "reconnect_attempts": 3,
+  "reconnect_delay_seconds": 2.0,
   "cameras": [
     {
       "id": "aerial_1",

@@ -1,0 +1,11 @@
+.git
+.venv
+venv
+__pycache__
+*.py[cod]
+artifacts
+data
+models
+dashboard
+*.pt
+*.sqlite3
