@@ -266,6 +266,7 @@ function readMultiRun(runId) {
     isMulti: true,
     updatedAt: statSync(summaryPath).mtime.toISOString(),
     hasVideo: streams.some((stream) => stream.previewFrames.length),
+    detector: detectorLabel(summary.config?.model),
     streams,
     reid: {
       method: reidReport.summary?.method ?? "Not generated yet",
