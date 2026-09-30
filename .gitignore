@@ -6,6 +6,9 @@ venv/
 data/
 models/
 artifacts/
+runs/
+.build/
+.chart-data-*/
 *.pt
 config.json
 multi_config.json
