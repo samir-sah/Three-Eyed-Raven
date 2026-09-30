@@ -83,7 +83,9 @@ function readTrainingProgress() {
     totalEpochs,
     progress: totalEpochs ? Math.round((completed ? totalEpochs : currentEpoch) / totalEpochs * 100) : 0,
     status: completed ? "completed" : running ? "running" : "paused",
-    lastLine: lastLine.replace(/\x1B\[[0-?]*[ -\/]*[@-~]/g, "").slice(-180),
+    lastLine: completed
+      ? `Completed ${totalEpochs}-epoch run; best checkpoint validated and ready for evaluation.`
+      : lastLine.replace(/\x1B\[[0-?]*[ -\/]*[@-~]/g, "").slice(-180),
     metrics: {
       precision: metric("metrics/precision(B)"),
       recall: metric("metrics/recall(B)"),

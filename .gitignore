@@ -8,6 +8,8 @@ models/
 artifacts/
 runs/
 .build/
+.codex-build/
+.codex-finalizer/
 .chart-data-*/
 *.pt
 config.json
