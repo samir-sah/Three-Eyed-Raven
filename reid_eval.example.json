@@ -1,0 +1,10 @@
+{
+  "queries": [
+    {"sample_id": "aerial_001", "person_id": "17", "camera_id": "aerial", "embedding": [0.98, 0.02]},
+    {"sample_id": "aerial_002", "person_id": "23", "camera_id": "aerial", "embedding": [0.02, 0.98]}
+  ],
+  "gallery": [
+    {"sample_id": "ground_101", "person_id": "17", "camera_id": "ground", "embedding": [0.99, 0.01]},
+    {"sample_id": "ground_102", "person_id": "23", "camera_id": "ground", "embedding": [0.01, 0.99]}
+  ]
+}

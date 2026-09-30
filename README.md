@@ -67,6 +67,15 @@ Each camera gets its own annotated video, observations, alerts, and summary unde
 
 The same run emits `reid_candidates.json`: an explainable HSV appearance-matching baseline that ranks possible cross-camera matches. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification. A trained aerial-ground Re-ID model is the next research upgrade after this baseline is evaluated.
 
+For a labeled aerial-ground dataset, evaluate exported query/gallery embeddings with standard Rank-1, Rank-5, Rank-10, and mAP metrics:
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.reid_eval_cli --manifest reid_eval.example.json
+```
+
+The included manifest is only a schema example; real metrics require a dataset with known same-person labels across camera views.
+
 ## Dashboard preview frames
 
 The annotated MP4 is created with OpenCV's FMP4 codec, which some browsers cannot play. Generate a browser-safe frame sequence for the Next.js dashboard with:

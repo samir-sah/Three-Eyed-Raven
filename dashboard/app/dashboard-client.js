@@ -132,13 +132,17 @@ function MultiStreamPlayer({ streams }) {
   );
 }
 
+function CandidateEvidence({ src, label }) {
+  return src ? <img src={src} alt={label} /> : <span className="candidate-placeholder" aria-label={`${label} unavailable`}>—</span>;
+}
+
 function ReIdCandidates({ reid }) {
   const candidates = reid?.candidates ?? [];
   return (
     <section className="reid-panel">
       <div className="reid-heading"><div><span className="eyebrow">CROSS-CAMERA RE-ID</span><h3>Appearance review candidates</h3></div><span className="subtle-pill">{reid?.reviewCandidates ?? 0} above threshold</span></div>
       <p className="reid-method">Method: {reid?.method ?? "Not generated"}{reid?.candidateThreshold ? ` · review threshold ${Math.round(reid.candidateThreshold * 100)}%` : ""}</p>
-      {candidates.length ? <div className="candidate-list">{candidates.map((candidate, index) => <div className="candidate-row" key={`${candidate.probe_camera_id}-${candidate.probe_track_id}-${candidate.gallery_camera_id}-${candidate.gallery_track_id}-${index}`}><div><strong>{candidate.probe_camera_id}/local-{candidate.probe_track_id}</strong><span>↔ {candidate.gallery_camera_id}/local-{candidate.gallery_track_id}</span></div><div className={candidate.status === "review" ? "candidate-score candidate-review" : "candidate-score"}><strong>{Math.round(candidate.similarity * 100)}%</strong><small>{candidate.status === "review" ? "manual review" : "below threshold"}</small></div></div>)}</div> : <div className="reid-empty">No candidates have been generated yet. Run the updated two-stream pipeline to populate this panel.</div>}
+      {candidates.length ? <div className="candidate-list">{candidates.map((candidate, index) => <div className="candidate-row" key={`${candidate.probe_camera_id}-${candidate.probe_track_id}-${candidate.gallery_camera_id}-${candidate.gallery_track_id}-${index}`}><div className="candidate-evidence"><CandidateEvidence src={candidate.probeImageUrl} label={`${candidate.probe_camera_id} local ${candidate.probe_track_id}`} /><span>↔</span><CandidateEvidence src={candidate.galleryImageUrl} label={`${candidate.gallery_camera_id} local ${candidate.gallery_track_id}`} /></div><div><strong>{candidate.probe_camera_id}/local-{candidate.probe_track_id}</strong><span>↔ {candidate.gallery_camera_id}/local-{candidate.gallery_track_id}</span></div><div className={candidate.status === "review" ? "candidate-score candidate-review" : "candidate-score"}><strong>{Math.round(candidate.similarity * 100)}%</strong><small>{candidate.status === "review" ? "manual review" : "below threshold"}</small></div></div>)}</div> : <div className="reid-empty">No candidates have been generated yet. Run the updated two-stream pipeline to populate this panel.</div>}
       <p className="reid-warning"><CircleAlert size={14} /> {reid?.warning}</p>
     </section>
   );

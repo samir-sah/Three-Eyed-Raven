@@ -3,6 +3,7 @@ import unittest
 import numpy as np
 
 from crowd_tracker.reid import CrossCameraMatcher, TrackDescriptor
+from crowd_tracker.reid_evaluation import LabeledEmbedding, evaluate_retrieval
 
 
 class ReIdTests(unittest.TestCase):
@@ -19,3 +20,16 @@ class ReIdTests(unittest.TestCase):
         first = TrackDescriptor("aerial", 1, 0.0, 1.0, 2, np.array([1.0, 0.0], dtype=np.float32))
         second = TrackDescriptor("aerial", 2, 0.0, 1.0, 2, np.array([1.0, 0.0], dtype=np.float32))
         self.assertEqual(CrossCameraMatcher().rank([first, second]), [])
+
+    def test_retrieval_metrics_report_perfect_cross_camera_ranking(self):
+        queries = [
+            LabeledEmbedding("a1", "1", "aerial", np.array([1.0, 0.0], dtype=np.float32)),
+            LabeledEmbedding("a2", "2", "aerial", np.array([0.0, 1.0], dtype=np.float32)),
+        ]
+        gallery = [
+            LabeledEmbedding("g1", "1", "ground", np.array([1.0, 0.0], dtype=np.float32)),
+            LabeledEmbedding("g2", "2", "ground", np.array([0.0, 1.0], dtype=np.float32)),
+        ]
+        result = evaluate_retrieval(queries, gallery)
+        self.assertEqual(result["rank_1"], 1.0)
+        self.assertEqual(result["mAP"], 1.0)

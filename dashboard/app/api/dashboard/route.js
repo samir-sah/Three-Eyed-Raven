@@ -156,6 +156,20 @@ function readMultiRun(runId) {
   });
   const observationWeight = streams.reduce((total, stream) => total + stream.frames, 0) || 1;
   const busiestStream = streams.reduce((best, stream) => (stream.peakCount > best.peakCount ? stream : best), { peakCount: 0, peakFrame: 0 });
+  const candidates = (reidReport.candidates ?? []).slice(0, 6).map((candidate) => {
+    const cropUrl = (cropPath) => {
+      if (!cropPath) return null;
+      const fileName = path.basename(cropPath);
+      return /^[-_a-zA-Z0-9]+_track_\d+\.jpg$/.test(fileName)
+        ? `/api/reid-crops/${encodeURIComponent(runId)}/${encodeURIComponent(fileName)}`
+        : null;
+    };
+    return {
+      ...candidate,
+      probeImageUrl: cropUrl(candidate.probe_thumbnail),
+      galleryImageUrl: cropUrl(candidate.gallery_thumbnail),
+    };
+  });
   return {
     id: runId,
     label: "Two Stream Demo",
@@ -168,7 +182,7 @@ function readMultiRun(runId) {
       candidateThreshold: reidReport.summary?.candidate_threshold ?? null,
       reviewCandidates: reidReport.summary?.review_candidates ?? 0,
       warning: reidReport.summary?.warning ?? "Run the updated two-stream pipeline to generate review candidates.",
-      candidates: (reidReport.candidates ?? []).slice(0, 6),
+      candidates,
     },
     metrics: {
       frames: summary.total_frames_processed ?? 0,

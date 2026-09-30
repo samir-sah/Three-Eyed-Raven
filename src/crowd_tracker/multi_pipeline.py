@@ -70,7 +70,8 @@ class MultiStreamPipeline:
 
         elapsed = max(time.perf_counter() - started, 1e-9)
         cameras = [self._camera_summary(state, elapsed) for state in states]
-        candidates = self.matcher.rank(self.gallery.descriptors())
+        thumbnail_paths = self.gallery.write_thumbnails(str(self.output_dir / "reid_crops"))
+        candidates = self.matcher.rank(self.gallery.descriptors(thumbnail_paths))
         reid_summary = {
             "method": "HSV appearance baseline",
             "candidate_threshold": self.config.reid_candidate_threshold,
