@@ -1,9 +1,10 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
 :root { --ink: #181818; --muted: #747474; --line: #e7e7e7; --paper: #ffffff; --wash: #f8f8f8; --soft: #f3f3f3; }
 * { box-sizing: border-box; }
 html { background: var(--wash); }
-body { margin: 0; color: var(--ink); background: var(--wash); font-family: var(--font-inter), Inter, Arial, sans-serif; font-size: 14px; }
+body { margin: 0; color: var(--ink); background: var(--wash); font-family: "Google Sans", Montserrat, Arial, sans-serif; font-size: 14px; }
 button, select { font: inherit; }
 button { cursor: pointer; }
 .shell { min-height: 100vh; display: grid; grid-template-columns: 320px minmax(0, 1fr); }
@@ -35,3 +36,9 @@ nav { display: grid; gap: 4px; }.nav-item { display: flex; align-items: center; 
 
 .evaluation-grid { grid-template-columns: repeat(8, minmax(0, 1fr)); }
 .benchmark-note { margin: 14px 0 0; color: #707070; font-size: 11px; line-height: 1.45; }
+
+/* Clearer evidence views added after dashboard validation. */
+.metric-conclusion { display: flex; align-items: center; gap: 12px; padding: 12px; margin: 14px 0; background: #f4f4f4; border-radius: 10px; }
+.metric-conclusion > strong { font-size: 25px; letter-spacing: -.06em; }.metric-conclusion span { color: #6e6e6e; font-size: 11px; }.metric-conclusion b { color: #1a1a1a; }.metric-details { margin-top: 14px; color: #666; font-size: 12px; line-height: 1.45; }.metric-details summary { cursor: pointer; color: #181818; font-weight: 700; }.metric-details > p { margin: 10px 0; }.metric-details .training-metrics { margin-top: 10px; }.benchmark-conclusion { max-width: 820px; margin: 0 0 14px; color: #666; font-size: 12px; line-height: 1.5; }
+.reid-method { max-width: 680px; line-height: 1.45; }.reid-warning { line-height: 1.45; }
+.multi-preview-wrap { overflow: hidden; background: #1c1c1c; border-radius: 14px; }.multi-preview-wrap .multi-stream-player { padding: 10px; background: #f4f4f4; }.multi-frame-controls { border-top: 1px solid #333; }.preview-caption { margin: 0; padding: 0 12px 11px; color: #d0d0d0; background: #1c1c1c; font-size: 10px; line-height: 1.4; }

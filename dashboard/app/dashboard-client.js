@@ -25,11 +25,11 @@ import {
 } from "lucide-react";
 
 const navItems = [
-  [LayoutDashboard, "Overview"],
-  [Video, "Video runs"],
-  [Activity, "Tracking"],
-  [ShieldCheck, "Alerts"],
-  [FolderKanban, "Development"],
+  ["overview", LayoutDashboard, "Overview"],
+  ["video-runs", Video, "Video runs"],
+  ["tracking", Activity, "Tracking"],
+  ["alerts", ShieldCheck, "Alerts"],
+  ["development", FolderKanban, "Development"],
 ];
 
 function number(value, digits = 0) {
@@ -87,18 +87,21 @@ function EmptyState() {
   );
 }
 
-function FramePlayer({ frames, videoUrl }) {
+function FramePlayer({ frames, videoUrl, sourceId, previewFps = 5 }) {
   const [frame, setFrame] = useState(0);
   const [playing, setPlaying] = useState(false);
 
   useEffect(() => {
     setFrame(0);
     setPlaying(false);
-  }, [frames]);
+  }, [sourceId]);
 
   useEffect(() => {
     if (!playing || frames.length < 2) return undefined;
-    const timer = window.setInterval(() => setFrame((current) => (current + 1) % frames.length), 115);
+    const timer = window.setInterval(
+      () => setFrame((current) => (current + 1) % frames.length),
+      Math.max(100, Math.round(1000 / previewFps)),
+    );
     return () => window.clearInterval(timer);
   }, [playing, frames.length]);
 
@@ -119,15 +122,44 @@ function FramePlayer({ frames, videoUrl }) {
   );
 }
 
-function MultiStreamPlayer({ streams }) {
+function MultiStreamPlayer({ streams, sourceId }) {
+  const frameCount = Math.min(...streams.map((stream) => stream.previewFrames.length));
+  const [frame, setFrame] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const previewFps = streams[0]?.previewFps ?? 5;
+
+  useEffect(() => {
+    setFrame(0);
+    setPlaying(false);
+  }, [sourceId]);
+
+  useEffect(() => {
+    if (!playing || frameCount < 2) return undefined;
+    const timer = window.setInterval(
+      () => setFrame((current) => (current + 1) % frameCount),
+      Math.max(100, Math.round(1000 / previewFps)),
+    );
+    return () => window.clearInterval(timer);
+  }, [playing, frameCount, previewFps]);
+
+  if (!frameCount) return <EmptyState />;
   return (
-    <div className="multi-stream-player">
-      {streams.map((stream) => (
-        <section className="camera-preview" key={stream.id}>
-          <div className="camera-preview-heading"><strong>{stream.label}</strong><span>{number(stream.localTracks)} local IDs</span></div>
-          <FramePlayer frames={stream.previewFrames} videoUrl="" />
-        </section>
-      ))}
+    <div className="multi-preview-wrap">
+      <div className="multi-stream-player">
+        {streams.map((stream) => (
+          <section className="camera-preview" key={stream.id}>
+            <div className="camera-preview-heading"><strong>{stream.label}</strong><span>{number(stream.localTracks)} local IDs</span></div>
+            <img className="frame-image" src={stream.previewFrames[frame]} alt={`${stream.label} annotated preview frame ${frame + 1}`} />
+          </section>
+        ))}
+      </div>
+      <div className="frame-controls multi-frame-controls">
+        <button className="frame-play" onClick={() => setPlaying((current) => !current)} aria-label={playing ? "Pause synchronized preview" : "Play synchronized preview"}>{playing ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}</button>
+        <span>{playing ? "Playing together" : "Paused"}</span>
+        <input aria-label="Synchronized preview timeline" type="range" min="0" max={frameCount - 1} value={frame} onChange={(event) => setFrame(Number(event.target.value))} />
+        <span>{frame + 1} / {frameCount}</span>
+      </div>
+      <p className="preview-caption">Synchronized annotated preview. Each step samples five original frames; it does not assert a cross-camera identity.</p>
     </div>
   );
 }
@@ -140,10 +172,10 @@ function ReIdCandidates({ reid }) {
   const candidates = reid?.candidates ?? [];
   return (
     <section className="reid-panel">
-      <div className="reid-heading"><div><span className="eyebrow">CROSS-CAMERA RE-ID</span><h3>Appearance review candidates</h3></div><span className="subtle-pill">{reid?.reviewCandidates ?? 0} above threshold</span></div>
-      <p className="reid-method">Method: {reid?.method ?? "Not generated"}{reid?.candidateThreshold ? ` · review threshold ${Math.round(reid.candidateThreshold * 100)}%` : ""}</p>
+      <div className="reid-heading"><div><span className="eyebrow">CROSS-CAMERA REVIEW</span><h3>Visual-similarity suggestions</h3></div><span className="subtle-pill">{reid?.reviewCandidates ?? 0} suggestions</span></div>
+      <p className="reid-method">A frame is one image from the video. A local ID is a temporary track in one camera. Method: {reid?.method ?? "Not generated"}{reid?.candidateThreshold ? ` · review threshold ${Math.round(reid.candidateThreshold * 100)}%` : ""}</p>
       {candidates.length ? <div className="candidate-list">{candidates.map((candidate, index) => <div className="candidate-row" key={`${candidate.probe_camera_id}-${candidate.probe_track_id}-${candidate.gallery_camera_id}-${candidate.gallery_track_id}-${index}`}><div className="candidate-evidence"><CandidateEvidence src={candidate.probeImageUrl} label={`${candidate.probe_camera_id} local ${candidate.probe_track_id}`} /><span>↔</span><CandidateEvidence src={candidate.galleryImageUrl} label={`${candidate.gallery_camera_id} local ${candidate.gallery_track_id}`} /></div><div><strong>{candidate.probe_camera_id}/local-{candidate.probe_track_id}</strong><span>↔ {candidate.gallery_camera_id}/local-{candidate.gallery_track_id}</span></div><div className={candidate.status === "review" ? "candidate-score candidate-review" : "candidate-score"}><strong>{Math.round(candidate.similarity * 100)}%</strong><small>{candidate.status === "review" ? "manual review" : "below threshold"}</small></div></div>)}</div> : <div className="reid-empty">No candidates have been generated yet. Run the updated two-stream pipeline to populate this panel.</div>}
-      <p className="reid-warning"><CircleAlert size={14} /> {reid?.warning}</p>
+      <p className="reid-warning"><CircleAlert size={14} /> {reid?.warning} These are not verified identities and must not be used to make decisions about people.</p>
     </section>
   );
 }
@@ -171,7 +203,8 @@ function TrainingProgress({ training }) {
   if (!training) return null;
   const label = training.status === "running" ? "Training in progress" : training.status === "completed" ? "Training completed" : "Training update unavailable";
   const metrics = [["Precision", training.metrics?.precision], ["Recall", training.metrics?.recall], ["mAP50", training.metrics?.map50], ["mAP50-95", training.metrics?.map5095]].filter(([, value]) => typeof value === "number");
-  return <section className="card training-card"><div className="card-heading"><div><span className="eyebrow">MODEL DEVELOPMENT</span><h2>{label}</h2><p>{training.name} · {relativeTime(training.updatedAt)}</p></div><span className={training.status === "running" ? "training-status training-status-running" : "training-status"}>{training.status}</span></div><div className="training-progress"><div><strong>{number(training.currentEpoch)} / {number(training.totalEpochs || 0)} epochs</strong><span>{number(training.progress)}% complete</span></div><div className="training-track"><span style={{ width: `${training.progress}%` }} /></div></div>{metrics.length > 0 && <div className="training-metrics">{metrics.map(([name, value]) => <div key={name}><span>{name}</span><strong>{number(value * 100, 2)}%</strong></div>)}</div>}<p className="training-log">{training.lastLine}</p></section>;
+  const headline = training.metrics?.map50;
+  return <section id="development" className="card training-card"><div className="card-heading"><div><span className="eyebrow">VISDRONE MODEL DEVELOPMENT</span><h2>{label}</h2><p>{training.name} · {relativeTime(training.updatedAt)}</p></div><span className={training.status === "running" ? "training-status training-status-running" : "training-status"}>{training.status}</span></div>{typeof headline === "number" && <div className="metric-conclusion"><strong>{number(headline * 100, 2)}%</strong><span><b>mAP50 detection quality</b> on the VisDrone person validation subset.</span></div>}<div className="training-progress"><div><strong>{number(training.currentEpoch)} / {number(training.totalEpochs || 0)} epochs</strong><span>{number(training.progress)}% complete</span></div><div className="training-track"><span style={{ width: `${training.progress}%` }} /></div></div>{metrics.length > 0 && <details className="metric-details"><summary>Show supporting training metrics</summary><div className="training-metrics">{metrics.map(([name, value]) => <div key={name}><span>{name}</span><strong>{number(value * 100, 2)}%</strong></div>)}</div></details>}<p className="training-log">{training.lastLine}</p></section>;
 }
 
 function FullMotBenchmark({ benchmark }) {
@@ -180,13 +213,14 @@ function FullMotBenchmark({ benchmark }) {
     ["Precision", benchmark.precision], ["Recall", benchmark.recall], ["F1", benchmark.f1],
     ["MOTA", benchmark.mota], ["MOTP", benchmark.motp], ["IDF1", benchmark.idf1], ["HOTA", benchmark.hota], ["ID switches", benchmark.id_switches],
   ];
-  return <section className="card evaluation-card full-benchmark-card"><div className="card-heading"><div><span className="eyebrow">TRAINED-MODEL EVALUATION</span><h2>Full MOT17 benchmark</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} ground-truth boxes · {relativeTime(benchmark.updatedAt)}</p></div><span className="subtle-pill">Completed batch</span></div><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div><p className="benchmark-note">VisDrone-trained detector evaluated with ByteTrack. HOTA is the project’s internal comparison metric; verify with official TrackEval before publication.</p></section>;
+  return <section className="card evaluation-card full-benchmark-card"><div className="card-heading"><div><span className="eyebrow">MOT17 CROSS-DOMAIN EVALUATION</span><h2>Strong precision, limited ground-camera recall</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} ground-truth boxes · {relativeTime(benchmark.updatedAt)}</p></div><span className="subtle-pill">Measured baseline</span></div><p className="benchmark-conclusion">This is a stress test: the VisDrone aerial-trained detector and ByteTrack were evaluated on MOT17 ground-surveillance footage. It is usually right when it detects someone ({number(benchmark.precision * 100, 1)}% precision), but it misses many people ({number(benchmark.recall * 100, 1)}% recall). This is a domain gap, not production-ready CCTV performance.</p><details className="metric-details"><summary>Explain and show all MOT17 metrics</summary><p>MOTA combines missed detections, false positives and ID changes; MOTP measures box alignment; IDF1 measures track identity continuity; HOTA balances detection and association. Higher is better except for ID switches.</p><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></details></section>;
 }
 
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
   const [selectedRun, setSelectedRun] = useState("");
+  const [activeSection, setActiveSection] = useState("overview");
   const [loading, setLoading] = useState(true);
   const [refreshedAt, setRefreshedAt] = useState(null);
 
@@ -209,8 +243,6 @@ export default function DashboardClient() {
 
   useEffect(() => {
     loadDashboard();
-    const timer = window.setInterval(loadDashboard, 8000);
-    return () => window.clearInterval(timer);
   }, []);
 
   const run = useMemo(
@@ -218,6 +250,10 @@ export default function DashboardClient() {
     [data, selectedRun],
   );
   const metrics = run?.metrics;
+  const goToSection = (section) => {
+    setActiveSection(section);
+    requestAnimationFrame(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
 
   return (
     <main className="shell">
@@ -226,8 +262,8 @@ export default function DashboardClient() {
         <button className="search-box"><Search size={18} /><span>Search project...</span><kbd>⌘K</kbd></button>
         <div className="side-label">Workspace</div>
         <nav>
-          {navItems.map(([Icon, label], index) => (
-            <button key={label} className={index === 0 ? "nav-item nav-item-active" : "nav-item"}><Icon size={18} />{label}</button>
+          {navItems.map(([id, Icon, label]) => (
+            <button key={label} onClick={() => goToSection(id)} className={activeSection === id ? "nav-item nav-item-active" : "nav-item"}><Icon size={18} />{label}</button>
           ))}
         </nav>
         <div className="sidebar-foot card">
@@ -257,11 +293,11 @@ export default function DashboardClient() {
           </div>
 
           {!run ? <EmptyState /> : <>
-            <div className="metric-grid">
+            <div id="overview" className="metric-grid">
               <MetricCard icon={Video} label="Processed frames" value={number(metrics.frames)} note={`${metrics.resolution} source resolution`} />
-              <MetricCard icon={Activity} label="Peak crowd count" value={number(metrics.peakCount)} note={`Observed around frame ${number(metrics.peakFrame)}`} accent />
-              <MetricCard icon={Gauge} label="Processing speed" value={`${number(metrics.processingFps, 2)} FPS`} note={`${number(metrics.duration, 1)} seconds of compute`} />
-              <MetricCard icon={Cpu} label="Local track IDs" value={number(metrics.uniqueTracks)} note={`${number(metrics.averageConfidence * 100, 1)}% mean detection confidence`} />
+              <MetricCard icon={Activity} label="Peak visible tracks" value={number(metrics.peakCount)} note={run.isMulti ? "In one camera; not added across views" : `Observed around frame ${number(metrics.peakFrame)}`} accent />
+              <MetricCard icon={Gauge} label={run.isMulti ? "Aggregate throughput" : "Processing speed"} value={`${number(metrics.processingFps, 2)} FPS`} note={run.isMulti ? "Combined speed across both feeds" : `${number(metrics.duration, 1)} seconds of compute`} />
+              <MetricCard icon={Cpu} label="Local trajectory IDs" value={number(metrics.uniqueTracks)} note={run.isMulti ? "Camera-local lifetime IDs, not people" : `${number(metrics.averageConfidence * 100, 1)}% mean detection confidence`} />
             </div>
 
             <TrainingProgress training={data.training} />
@@ -269,28 +305,28 @@ export default function DashboardClient() {
             <FullMotBenchmark benchmark={data.benchmark} />
 
             <div className="content-grid">
-              <section className="card video-card">
+              <section id="video-runs" className="card video-card">
                 <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2><p>{run.detector ?? "Detector not recorded"}</p></div><span className="live-badge"><span /> Recorded run</span></div>
-                {run.hasVideo ? (run.isMulti ? <MultiStreamPlayer streams={run.streams} /> : <FramePlayer frames={run.previewFrames} videoUrl={run.videoUrl} />) : <EmptyState />}
+                {run.hasVideo ? (run.isMulti ? <MultiStreamPlayer streams={run.streams} sourceId={run.id} /> : <FramePlayer frames={run.previewFrames} videoUrl={run.videoUrl} sourceId={run.id} previewFps={run.previewFps} />) : <EmptyState />}
                 <div className="video-footer"><span><CheckCircle2 size={16} /> {run.isMulti ? "Both feeds processed with independent local trackers" : "Detection & local tracking completed"}</span>{!run.isMulti && <a href={run.videoUrl} download><Download size={16} /> Download MP4</a>}</div>
                 {run.isMulti && <ReIdCandidates reid={run.reid} />}
               </section>
 
-              <section className="card tracks-card">
+              <section id="tracking" className="card tracks-card">
                 <div className="card-heading"><div><span className="eyebrow">TRACK HEALTH</span><h2>{run.isMulti ? "Independent camera summaries" : "Most persistent IDs"}</h2></div><span className="subtle-pill">{number(metrics.uniqueTracks)} total</span></div>
                 <div className="track-list">
                 {run.isMulti ? run.streams.map((stream) => <div className="track-row" key={stream.id}><span className="track-avatar"><Video size={14} /></span><div><strong>{stream.label}</strong><small>{number(stream.frames)} frames · peak {number(stream.peakCount)} people · {stream.detector}</small></div><div className="confidence"><strong>{number(stream.localTracks)}</strong><small>local IDs</small></div></div>) : run.tracks.length ? run.tracks.map((track) => <div className="track-row" key={track.id}><span className="track-avatar">{track.id}</span><div><strong>local-{track.id}</strong><small>Frames {track.firstFrame}–{track.lastFrame}</small></div><div className="confidence"><strong>{number(track.meanConfidence * 100, 0)}%</strong><small>confidence</small></div></div>) : <p className="muted">No tracked-person observations were recorded.</p>}
                 </div>
                 <div className="alert-box"><CircleAlert size={18} /><div><strong>{metrics.alertCount ? `${metrics.alertCount} crowd alert${metrics.alertCount === 1 ? "" : "s"}` : "No crowd alerts"}</strong><span>{metrics.alertCount ? "Zone threshold crossings are recorded below." : "Zone threshold was not exceeded in this run."}</span></div></div>
-                {run.isMulti && <section className="alert-history-panel"><span className="eyebrow">ZONE EVENT LOG</span><AlertHistory alerts={run.alerts} /></section>}
+                {run.isMulti && <section id="alerts" className="alert-history-panel"><span className="eyebrow">ZONE EVENT LOG</span><AlertHistory alerts={run.alerts} /></section>}
               </section>
             </div>
 
-            <section className="card chart-card">
+            {!run.isMulti && <section className="card chart-card">
               <div className="card-heading"><div><span className="eyebrow">FRAME-BY-FRAME ANALYSIS</span><h2>Observed people over time</h2><p>Unique local track IDs visible in each processed frame.</p></div><div className="chart-legend"><span><i className="legend-line" /> People detected</span><span><Clock3 size={15} /> Frame range: 0–{number(metrics.frames)}</span></div></div>
               <OccupancyChart timeline={run.timeline} />
               <div className="chart-labels"><span>Start</span><span>Peak: {number(metrics.peakCount)} people</span><span>End</span></div>
-            </section>
+            </section>}
 
             <section className="card latency-card"><div className="card-heading"><div><span className="eyebrow">PIPELINE PROFILING</span><h2>Stage latency breakdown</h2><p>Measured during this completed run; values are per stage call.</p></div><span className="subtle-pill">milliseconds</span></div><LatencyProfile stages={run.latencyProfile} /></section>
 

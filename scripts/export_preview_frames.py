@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import json
 from pathlib import Path
 
 import cv2
@@ -37,6 +38,9 @@ def main() -> None:
     if not capture.isOpened():
         raise RuntimeError(f"Could not read: {source}")
 
+    source_fps = capture.get(cv2.CAP_PROP_FPS) or 0
+    source_width = int(capture.get(cv2.CAP_PROP_FRAME_WIDTH) or 0)
+    source_height = int(capture.get(cv2.CAP_PROP_FRAME_HEIGHT) or 0)
     frame_number = 0
     written = 0
     try:
@@ -56,6 +60,19 @@ def main() -> None:
     finally:
         capture.release()
 
+    (output / "metadata.json").write_text(
+        json.dumps(
+            {
+                "source_fps": source_fps,
+                "source_frames": frame_number,
+                "source_resolution": [source_width, source_height],
+                "preview_stride": args.stride,
+                "preview_frames": written,
+            },
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
     print(f"Wrote {written} browser-preview frames to {output}")
 
 

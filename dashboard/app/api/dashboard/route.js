@@ -51,6 +51,23 @@ function sampleTimeline(frameCounts) {
     : [...sampled, frameCounts.at(-1)];
 }
 
+function readPreviewFrames(directory, urlForFile) {
+  if (!existsSync(directory)) return { frames: [], previewFps: 5 };
+  const metadata = safeJson(path.join(directory, "metadata.json"), {});
+  const frames = readdirSync(directory)
+    .filter((file) => /^frame_\d+\.jpg$/.test(file))
+    .sort()
+    .map(urlForFile);
+  const sourceFps = Number(metadata.source_fps);
+  const stride = Number(metadata.preview_stride);
+  return {
+    frames,
+    previewFps: Number.isFinite(sourceFps) && Number.isFinite(stride) && stride > 0
+      ? sourceFps / stride
+      : 5,
+  };
+}
+
 function findFiles(directory, name, found = []) {
   if (!existsSync(directory)) return found;
   for (const entry of readdirSync(directory, { withFileTypes: true })) {
@@ -170,13 +187,10 @@ function readRun(runId) {
     .sort((first, second) => second.frames - first.frames)
     .slice(0, 4);
   const videoPath = path.join(runDirectory, "annotated.mp4");
-  const previewDirectory = path.join(runDirectory, "preview_frames");
-  const previewFrames = existsSync(previewDirectory)
-    ? readdirSync(previewDirectory)
-      .filter((file) => /^frame_\d+\.jpg$/.test(file))
-      .sort()
-      .map((file) => `/api/frames/${encodeURIComponent(runId)}/${encodeURIComponent(file)}`)
-    : [];
+  const preview = readPreviewFrames(
+    path.join(runDirectory, "preview_frames"),
+    (file) => `/api/frames/${encodeURIComponent(runId)}/${encodeURIComponent(file)}`,
+  );
 
   return {
     id: runId,
@@ -184,7 +198,8 @@ function readRun(runId) {
     updatedAt: statSync(summaryPath).mtime.toISOString(),
     hasVideo: existsSync(videoPath),
     videoUrl: `/api/artifacts/${encodeURIComponent(runId)}/annotated.mp4`,
-    previewFrames,
+    previewFrames: preview.frames,
+    previewFps: preview.previewFps,
     detector: detectorLabel(summary.config?.model),
     metrics: {
       frames: summary.frames_processed ?? 0,
@@ -216,13 +231,10 @@ function readMultiRun(runId) {
     const cameraDirectory = path.join(runDirectory, camera.camera_id);
     const observations = readJsonLines(path.join(cameraDirectory, "observations.jsonl"));
     const alerts = readJsonLines(path.join(cameraDirectory, "alerts.jsonl"));
-    const previewDirectory = path.join(cameraDirectory, "preview_frames");
-    const previewFrames = existsSync(previewDirectory)
-      ? readdirSync(previewDirectory)
-        .filter((file) => /^frame_\d+\.jpg$/.test(file))
-        .sort()
-        .map((file) => `/api/multi-frames/${encodeURIComponent(runId)}/${encodeURIComponent(camera.camera_id)}/${encodeURIComponent(file)}`)
-      : [];
+    const preview = readPreviewFrames(
+      path.join(cameraDirectory, "preview_frames"),
+      (file) => `/api/multi-frames/${encodeURIComponent(runId)}/${encodeURIComponent(camera.camera_id)}/${encodeURIComponent(file)}`,
+    );
     const frameCounts = new Map();
     for (const observation of observations) {
       const frame = observation.frame_index ?? 0;
@@ -239,8 +251,10 @@ function readMultiRun(runId) {
       id: camera.camera_id,
       label: cameraLabel(camera.camera_id),
       detector: detectorLabel(camera.model ?? fallbackModel),
-      previewFrames,
+      previewFrames: preview.frames,
+      previewFps: preview.previewFps,
       source: camera.source,
+      resolution: camera.source_resolution?.join(" × ") ?? "—",
       frames: camera.frames_processed,
       localTracks: camera.unique_local_track_ids,
       peakCount,
@@ -256,7 +270,7 @@ function readMultiRun(runId) {
   const alerts = streams
     .flatMap((stream) => stream.alerts.map((alert) => ({ ...alert, cameraId: stream.id, cameraLabel: stream.label })))
     .sort((first, second) => (second.timestamp_seconds ?? 0) - (first.timestamp_seconds ?? 0));
-  const candidates = (reidReport.candidates ?? []).slice(0, 6).map((candidate) => {
+  const candidates = (reidReport.candidates ?? []).slice(0, 3).map((candidate) => {
     const cropUrl = (cropPath) => {
       if (!cropPath) return null;
       const fileName = path.basename(cropPath);
@@ -289,13 +303,13 @@ function readMultiRun(runId) {
       frames: summary.total_frames_processed ?? 0,
       processingFps: summary.aggregate_processing_fps ?? 0,
       duration: summary.elapsed_seconds ?? 0,
-      resolution: "Aerial + CCTV",
+      resolution: streams.map((stream) => stream.resolution).join(" + "),
       uniqueTracks: streams.reduce((total, stream) => total + (stream.localTracks ?? 0), 0),
       averageConfidence: streams.reduce((total, stream) => total + stream.averageConfidence * stream.frames, 0) / observationWeight,
       peakCount: busiestStream.peakCount,
       peakFrame: busiestStream.peakFrame,
       alertCount: streams.reduce((total, stream) => total + stream.alertCount, 0),
-      source: "Independent aerial and ground feeds",
+      source: "Two synchronized laboratory camera views",
     },
     timeline: [],
     latencyProfile: summary.latency_profile ?? [],
