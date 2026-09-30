@@ -1,0 +1,4 @@
+{"frame_index": 0, "track_id": "person_a", "bbox_xyxy": [0, 0, 10, 10]}
+{"frame_index": 0, "track_id": "person_b", "bbox_xyxy": [20, 0, 30, 10]}
+{"frame_index": 1, "track_id": "person_a", "bbox_xyxy": [1, 0, 11, 10]}
+{"frame_index": 1, "track_id": "person_b", "bbox_xyxy": [21, 0, 31, 10]}

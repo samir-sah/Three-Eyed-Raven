@@ -47,6 +47,17 @@ $env:PYTHONPATH = "src"
 python -m unittest discover -s tests -v
 ```
 
+## Tracking benchmark evaluation
+
+Use a labeled JSONL file with stable ground-truth IDs to evaluate one camera sequence. Prediction records use the project's existing `observations.jsonl` format. The evaluator reports precision, recall, F1, MOTA, MOTP, false positives/negatives, and local-ID switches at the chosen IoU threshold.
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.tracking_eval_cli --ground-truth examples\tracking_ground_truth.jsonl --predictions examples\tracking_predictions.jsonl --output artifacts\benchmark_example.json
+```
+
+The bundled files are a format example only. Report real results only after evaluating against a labeled benchmark such as MOT17 or VisDrone-MOT; do not treat demo footage as ground truth.
+
 ## Next implementation steps
 
 1. Evaluate detection and tracking on VisDrone/MOT17 rather than relying on a visual demo.
