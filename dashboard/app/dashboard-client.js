@@ -21,6 +21,7 @@ import {
   RefreshCw,
   Search,
   ShieldCheck,
+  Upload,
   Video,
 } from "lucide-react";
 
@@ -216,6 +217,68 @@ function FullMotBenchmark({ benchmark }) {
   return <section className="card evaluation-card full-benchmark-card"><div className="card-heading"><div><span className="eyebrow">MOT17 CROSS-DOMAIN EVALUATION</span><h2>Strong precision, limited ground-camera recall</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} ground-truth boxes · {relativeTime(benchmark.updatedAt)}</p></div><span className="subtle-pill">Measured baseline</span></div><p className="benchmark-conclusion">This is a stress test: the VisDrone aerial-trained detector and ByteTrack were evaluated on MOT17 ground-surveillance footage. It is usually right when it detects someone ({number(benchmark.precision * 100, 1)}% precision), but it misses many people ({number(benchmark.recall * 100, 1)}% recall). This is a domain gap, not production-ready CCTV performance.</p><details className="metric-details"><summary>Explain and show all MOT17 metrics</summary><p>MOTA combines missed detections, false positives and ID changes; MOTP measures box alignment; IDF1 measures track identity continuity; HOTA balances detection and association. Higher is better except for ID switches.</p><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></details></section>;
 }
 
+function UploadRunPanel({ onCompleted }) {
+  const [aerial, setAerial] = useState(null);
+  const [ground, setGround] = useState(null);
+  const [maxFrames, setMaxFrames] = useState("600");
+  const [job, setJob] = useState(null);
+  const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!job?.runId || ["completed", "failed"].includes(job.status)) return undefined;
+    let active = true;
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/upload-run/${job.runId}`, { cache: "no-store" });
+        if (!response.ok) return;
+        const next = await response.json();
+        if (!active) return;
+        setJob(next);
+        if (next.status === "completed") onCompleted(next.runId);
+      } catch {
+        // The next poll will retry while the local dashboard is available.
+      }
+    };
+    poll();
+    const timer = window.setInterval(poll, 2500);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [job?.runId, job?.status, onCompleted]);
+
+  async function submit(event) {
+    event.preventDefault();
+    if (!aerial || !ground) { setMessage("Choose both an aerial and a ground-surveillance video."); return; }
+    setSubmitting(true);
+    setMessage("");
+    try {
+      const form = new FormData();
+      form.append("aerial", aerial);
+      form.append("ground", ground);
+      form.append("maxFrames", maxFrames);
+      const response = await fetch("/api/upload-run", { method: "POST", body: form });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "The upload run could not start.");
+      setJob(result);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The upload run could not start.");
+    } finally { setSubmitting(false); }
+  }
+
+  const status = job?.status;
+  return <section className="card upload-run-panel">
+    <div className="card-heading"><div><span className="eyebrow">YOUR TWO-CAMERA RUN</span><h2>Upload aerial and ground videos</h2><p>Files remain on this computer. The system detects people, creates local tracks, and produces visual-similarity suggestions for manual review.</p></div><span className="subtle-pill">Local processing</span></div>
+    <form className="upload-form" onSubmit={submit}>
+      <label className={aerial ? "upload-slot upload-slot-ready" : "upload-slot"}><Upload size={19} /><span><b>Aerial / drone video</b><small>{aerial ? aerial.name : "MP4, AVI, MOV, MKV, MPG or WebM"}</small></span><input type="file" accept="video/*,.mp4,.avi,.mov,.mkv,.mpg,.mpeg,.webm" onChange={(event) => setAerial(event.target.files?.[0] ?? null)} /></label>
+      <label className={ground ? "upload-slot upload-slot-ready" : "upload-slot"}><Upload size={19} /><span><b>Ground surveillance video</b><small>{ground ? ground.name : "MP4, AVI, MOV, MKV, MPG or WebM"}</small></span><input type="file" accept="video/*,.mp4,.avi,.mov,.mkv,.mpg,.mpeg,.webm" onChange={(event) => setGround(event.target.files?.[0] ?? null)} /></label>
+      <label className="frame-limit"><span>Frames per camera</span><input type="number" min="1" max="20000" value={maxFrames} onChange={(event) => setMaxFrames(event.target.value)} placeholder="Full video" /><small>Use 600 for a quick demo, or clear this field for the full videos.</small></label>
+      <button className="primary-button upload-submit" disabled={submitting || ["queued", "processing"].includes(status)}><Upload size={17} /> {submitting ? "Uploading…" : status === "processing" || status === "queued" ? "Processing…" : "Start two-camera analysis"}</button>
+    </form>
+    {message && <p className="upload-message upload-message-error">{message}</p>}
+    {job && <div className={status === "failed" ? "upload-message upload-message-error" : "upload-message"}><strong>{status === "completed" ? "Analysis complete" : status === "failed" ? "Analysis failed" : "Working on your run"}</strong><span>{job.error ?? job.stage}</span>{status === "completed" && <small>Your new run is selected above. Open the playback below to review it.</small>}</div>}
+    <p className="upload-privacy"><CircleAlert size={14} /> Similar-looking people are only placed in a manual-review queue; the project does not verify identity or make automated decisions about people.</p>
+  </section>;
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
@@ -253,6 +316,10 @@ export default function DashboardClient() {
   const goToSection = (section) => {
     setActiveSection(section);
     requestAnimationFrame(() => document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+  };
+  const selectUploadedRun = async (runId) => {
+    await loadDashboard();
+    setSelectedRun(runId);
   };
 
   return (
@@ -293,6 +360,7 @@ export default function DashboardClient() {
           </div>
 
           {!run ? <EmptyState /> : <>
+            <UploadRunPanel onCompleted={selectUploadedRun} />
             <div id="overview" className="metric-grid">
               <MetricCard icon={Video} label="Processed frames" value={number(metrics.frames)} note={`${metrics.resolution} source resolution`} />
               <MetricCard icon={Activity} label="Peak visible tracks" value={number(metrics.peakCount)} note={run.isMulti ? "In one camera; not added across views" : `Observed around frame ${number(metrics.peakFrame)}`} accent />

@@ -24,7 +24,7 @@ function detectorLabel(modelPath) {
 
 function cameraLabel(cameraId) {
   if (cameraId.startsWith("aerial")) return "Aerial / drone view";
-  if (cameraId.startsWith("cctv")) return "Ground / CCTV view";
+  if (cameraId.startsWith("cctv") || cameraId.startsWith("ground")) return "Ground / surveillance view";
   return cameraId.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
@@ -286,7 +286,7 @@ function readMultiRun(runId) {
   });
   return {
     id: runId,
-    label: "Two Stream Demo",
+    label: runId.startsWith("upload_") ? "Uploaded two-camera run" : "Two Stream Demo",
     isMulti: true,
     updatedAt: statSync(summaryPath).mtime.toISOString(),
     hasVideo: streams.some((stream) => stream.previewFrames.length),
@@ -309,7 +309,7 @@ function readMultiRun(runId) {
       peakCount: busiestStream.peakCount,
       peakFrame: busiestStream.peakFrame,
       alertCount: streams.reduce((total, stream) => total + stream.alertCount, 0),
-      source: "Two synchronized laboratory camera views",
+      source: runId.startsWith("upload_") ? "Your uploaded aerial and ground videos" : "Two synchronized laboratory camera views",
     },
     timeline: [],
     latencyProfile: summary.latency_profile ?? [],
