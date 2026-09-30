@@ -45,6 +45,7 @@ function readRun(runId) {
   const summary = safeJson(summaryPath, {});
   const observations = readJsonLines(path.join(runDirectory, "observations.jsonl"));
   const alerts = readJsonLines(path.join(runDirectory, "alerts.jsonl"));
+  const evaluation = safeJson(path.join(runDirectory, "evaluation.json"), null);
   const tracksByFrame = new Map();
   const tracks = new Map();
 
@@ -111,6 +112,7 @@ function readRun(runId) {
     latencyProfile: summary.latency_profile ?? [],
     tracks: stableTracks,
     alerts: alerts.slice(-5).reverse(),
+    evaluation,
   };
 }
 
@@ -205,6 +207,7 @@ function readMultiRun(runId) {
     latencyProfile: summary.latency_profile ?? [],
     tracks: [],
     alerts,
+    evaluation: null,
   };
 }
 

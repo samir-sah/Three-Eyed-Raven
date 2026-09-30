@@ -14,9 +14,13 @@ def main() -> None:
     parser.add_argument("--output", required=True, help="Destination JSONL path.")
     parser.add_argument("--person-class", type=int, default=1, help="MOT class ID to retain (default: 1).")
     parser.add_argument("--min-visibility", type=float, default=0.0, help="Minimum MOT visibility to retain.")
+    parser.add_argument("--start-frame", type=int, default=1, help="First one-based MOT frame to include.")
+    parser.add_argument("--end-frame", type=int, help="Last one-based MOT frame to include.")
     args = parser.parse_args()
     if not 0 <= args.min_visibility <= 1:
         raise ValueError("min-visibility must be between 0 and 1.")
+    if args.start_frame < 1 or (args.end_frame is not None and args.end_frame < args.start_frame):
+        raise ValueError("Frame range is invalid.")
 
     output = Path(args.output)
     output.parent.mkdir(parents=True, exist_ok=True)
@@ -30,6 +34,8 @@ def main() -> None:
             confidence = float(row[6]) if len(row) > 6 else 1.0
             category = int(float(row[7])) if len(row) > 7 else args.person_class
             visibility = float(row[8]) if len(row) > 8 else 1.0
+            if frame < args.start_frame or (args.end_frame is not None and frame > args.end_frame):
+                continue
             if confidence <= 0 or category != args.person_class or visibility < args.min_visibility:
                 continue
             destination.write(json.dumps({

@@ -158,6 +158,15 @@ function LatencyProfile({ stages }) {
   return <div className="latency-list">{stages.map((stage) => <div className="latency-row" key={stage.stage}><div><strong>{stage.stage.replaceAll("_", " ")}</strong><small>{number(stage.calls)} calls · p95 {number(stage.p95_ms, 1)} ms</small></div><span>{number(stage.mean_ms, 1)} ms</span></div>)}</div>;
 }
 
+function EvaluationResults({ evaluation }) {
+  if (!evaluation) return null;
+  const metrics = [
+    ["Precision", evaluation.precision], ["Recall", evaluation.recall], ["F1", evaluation.f1],
+    ["MOTA", evaluation.mota], ["MOTP", evaluation.motp], ["ID switches", evaluation.id_switches],
+  ];
+  return <section className="card evaluation-card"><div className="card-heading"><div><span className="eyebrow">BENCHMARK EVALUATION</span><h2>Recorded tracking metrics</h2><p>IoU threshold {Math.round((evaluation.iou_threshold ?? 0.5) * 100)}% · Ground truth: {number(evaluation.ground_truth_boxes)} boxes</p></div><span className="subtle-pill">Measured baseline</span></div><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></section>;
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
@@ -264,6 +273,8 @@ export default function DashboardClient() {
             </section>
 
             <section className="card latency-card"><div className="card-heading"><div><span className="eyebrow">PIPELINE PROFILING</span><h2>Stage latency breakdown</h2><p>Measured during this completed run; values are per stage call.</p></div><span className="subtle-pill">milliseconds</span></div><LatencyProfile stages={run.latencyProfile} /></section>
+
+            <EvaluationResults evaluation={run.evaluation} />
 
             <section className="development-row">
               <article className="card development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></article>

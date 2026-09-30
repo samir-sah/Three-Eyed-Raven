@@ -14,7 +14,7 @@ class MotImportTests(unittest.TestCase):
             destination = root / "ground_truth.jsonl"
             source.write_text("1,7,10,20,30,40,1,1,0.8\n2,8,0,0,5,5,1,2,1\n", encoding="utf-8")
             result = subprocess.run([
-                sys.executable, "-m", "crowd_tracker.mot_import_cli", "--input", str(source), "--output", str(destination),
+                sys.executable, "-m", "crowd_tracker.mot_import_cli", "--input", str(source), "--output", str(destination), "--end-frame", "1",
             ], check=True, capture_output=True, text=True)
             self.assertEqual(json.loads(result.stdout)["written"], 1)
             record = json.loads(destination.read_text(encoding="utf-8"))

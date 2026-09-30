@@ -27,6 +27,17 @@ Copy `configs/visdrone_person.example.yaml` to `configs/visdrone_person.yaml` an
 
 Keep training, validation, and test sequences separated. Store a copy of each generated metric report with the checkpoint name, GPU, input size, and command-line arguments. Do not report demo-video values as benchmark results.
 
+## MOT17 ByteTrack benchmark run
+
+After extracting the official MOT17 archive, run an image sequence and export the identical frame range from its ground truth. This produces a real, reproducible baseline—although COCO-pretrained YOLO has not yet been fine-tuned for MOT17, so treat the first result as a baseline rather than a target claim.
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.mot_run_cli --images data\raw\MOT17\train\MOT17-02-FRCNN\img1 --output artifacts\mot17_02_baseline --max-frames 120 --device auto
+python -m crowd_tracker.mot_import_cli --input data\raw\MOT17\train\MOT17-02-FRCNN\gt\gt.txt --output artifacts\mot17_02_ground_truth.jsonl --end-frame 120
+python -m crowd_tracker.tracking_eval_cli --ground-truth artifacts\mot17_02_ground_truth.jsonl --predictions artifacts\mot17_02_baseline\observations.jsonl --output artifacts\mot17_02_baseline\evaluation.json
+```
+
 ## Re-ID training preparation
 
 Create a JSONL manifest with `path`, `person_id`, `camera_id`, and `split`; use `configs/reid_train.example.jsonl` as the schema. Each train identity needs at least two images, ideally from different camera viewpoints. Then train a shared ResNet encoder using triplet loss:

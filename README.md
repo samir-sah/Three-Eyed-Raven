@@ -112,6 +112,8 @@ python -m crowd_tracker.tracking_eval_cli --ground-truth artifacts\ground_truth.
 
 For VisDrone aerial detector fine-tuning, use the preparation and training commands in [DATASETS.md](DATASETS.md). The project now includes a single-class VisDrone-to-YOLO converter and a reproducible Ultralytics training entry point; training starts only after the official data is acquired and split correctly.
 
+For a direct MOT17 image-sequence benchmark command, see [DATASETS.md](DATASETS.md). It writes pipeline timing and observations in the same artifact format used by the dashboard.
+
 ## Persistence and containers
 
 Every completed run is indexed in `artifacts/runs.sqlite3`. Index existing artifacts once after upgrading:
