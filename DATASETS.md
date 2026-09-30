@@ -38,6 +38,26 @@ python -m crowd_tracker.mot_import_cli --input data\raw\MOT17\train\MOT17-02-FRC
 python -m crowd_tracker.tracking_eval_cli --ground-truth artifacts\mot17_02_ground_truth.jsonl --predictions artifacts\mot17_02_baseline\observations.jsonl --output artifacts\mot17_02_baseline\evaluation.json
 ```
 
+## MOT17 batch benchmark
+
+After selecting a trained detector checkpoint, evaluate the available FRCNN sequences in one repeatable command. The output contains per-sequence artifacts plus `benchmark_summary.json` with aggregate precision, recall, F1, MOTA, MOTP, IDF1, HOTA, ID switches, and latency from each sequence summary.
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.mot_benchmark_cli --mot-root data\raw\MOT17\train --output artifacts\mot17_visdrone_person_50e --model runs\detect\runs\detect\visdrone_person_50e\weights\best.pt --device 0
+```
+
+For a quick smoke benchmark before the full run, add `--max-frames 120`. Keep its report separate from the full-sequence result.
+
+## Resuming memory-constrained detector training
+
+If a machine exhausts memory in a data-loader worker, resume from the run's `last.pt` checkpoint with fewer workers. This preserves the experiment's saved epoch state.
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.train_detector_cli --data configs\visdrone_person.example.yaml --resume runs\detect\runs\detect\visdrone_person_50e\weights\last.pt --workers 1
+```
+
 ## Re-ID training preparation
 
 Create a JSONL manifest with `path`, `person_id`, `camera_id`, and `split`; use `configs/reid_train.example.jsonl` as the schema. Each train identity needs at least two images, ideally from different camera viewpoints. Then train a shared ResNet encoder using triplet loss:
