@@ -11,13 +11,19 @@ import cv2
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("--run", default="live_preview", help="Artifact run name under artifacts/")
+    parser.add_argument("--camera", help="Optional camera id for a multi-camera run")
     parser.add_argument("--stride", type=int, default=5, help="Keep one preview image every N source frames")
     parser.add_argument("--width", type=int, default=540, help="Preview image width in pixels")
     args = parser.parse_args()
 
     project_root = Path(__file__).resolve().parents[1]
-    source = project_root / "artifacts" / args.run / "annotated.mp4"
-    output = project_root / "artifacts" / args.run / "preview_frames"
+    run_directory = project_root / "artifacts" / args.run
+    if args.camera:
+        if Path(args.camera).name != args.camera:
+            raise ValueError("camera must be a simple camera id, not a path")
+        run_directory /= args.camera
+    source = run_directory / "annotated.mp4"
+    output = run_directory / "preview_frames"
     if not source.exists():
         raise FileNotFoundError(f"Annotated video does not exist: {source}")
     if args.stride < 1 or args.width < 64:

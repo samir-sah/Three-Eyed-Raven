@@ -22,6 +22,12 @@ function detectorLabel(modelPath) {
   return path.basename(String(modelPath));
 }
 
+function cameraLabel(cameraId) {
+  if (cameraId.startsWith("aerial")) return "Aerial / drone view";
+  if (cameraId.startsWith("cctv")) return "Ground / CCTV view";
+  return cameraId.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
 function readJsonLines(filePath) {
   if (!existsSync(filePath)) return [];
   return readFileSync(filePath, "utf8")
@@ -231,7 +237,7 @@ function readMultiRun(runId) {
       : 0;
     return {
       id: camera.camera_id,
-      label: camera.camera_id.startsWith("aerial") ? "Aerial / drone view" : "Ground / CCTV view",
+      label: cameraLabel(camera.camera_id),
       detector: detectorLabel(camera.model ?? fallbackModel),
       previewFrames,
       source: camera.source,

@@ -153,6 +153,10 @@ The sample two-stream configuration includes a full-frame observation zone for e
 
 The top-level `model` is the default detector for every camera. A camera can optionally provide its own `model` value when a measured domain difference justifies it—for example, a fine-tuned aerial detector for a drone feed and a general person detector for an uncalibrated ground feed. Each run summary records the detector used by each camera so the dashboard and evaluation remain auditable.
 
+### Overlapping multi-camera demonstration footage
+
+For a genuine same-person, multi-view demo, use the EPFL laboratory sequence rather than unrelated videos. Its synchronized camera streams film the same area from different angles; the people in each view are the same participants. The videos are copyrighted by CVLab–EPFL and available for research use only, so they are deliberately excluded from this repository. Download two views from [EPFL's Multi-camera Pedestrian Videos dataset](https://www.epfl.ch/labs/cvlab/data/data-pom-index-php/), retain the attribution, and place local clips under the ignored `data/` directory before configuring `multi_config.json`.
+
 The same run emits `reid_candidates.json`: an explainable HSV appearance-matching baseline that ranks possible cross-camera matches. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification. A trained aerial-ground Re-ID model is the next research upgrade after this baseline is evaluated.
 
 For a labeled aerial-ground dataset, evaluate exported query/gallery embeddings with standard Rank-1, Rank-5, Rank-10, and mAP metrics:
@@ -170,4 +174,11 @@ The annotated MP4 is created with OpenCV's FMP4 codec, which some browsers canno
 
 ```bat
 python scripts\export_preview_frames.py --run live_preview
+```
+
+For a multi-camera run, export each camera's annotated video separately so both views are playable in the dashboard:
+
+```bat
+python scripts\export_preview_frames.py --run two_stream_demo --camera lab_cam_0
+python scripts\export_preview_frames.py --run two_stream_demo --camera lab_cam_1
 ```
