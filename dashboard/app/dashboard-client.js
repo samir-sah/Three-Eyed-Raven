@@ -173,12 +173,22 @@ function ReIdCandidates({ reid }) {
   const candidates = reid?.candidates ?? [];
   return (
     <section className="reid-panel">
-      <div className="reid-heading"><div><span className="eyebrow">CROSS-CAMERA REVIEW</span><h3>Visual-similarity suggestions</h3></div><span className="subtle-pill">{reid?.reviewCandidates ?? 0} suggestions</span></div>
-      <p className="reid-method">A frame is one image from the video. A local ID is a temporary track in one camera. Method: {reid?.method ?? "Not generated"}{reid?.candidateThreshold ? ` · review threshold ${Math.round(reid.candidateThreshold * 100)}%` : ""}</p>
-      {candidates.length ? <div className="candidate-list">{candidates.map((candidate, index) => <div className="candidate-row" key={`${candidate.probe_camera_id}-${candidate.probe_track_id}-${candidate.gallery_camera_id}-${candidate.gallery_track_id}-${index}`}><div className="candidate-evidence"><CandidateEvidence src={candidate.probeImageUrl} label={`${candidate.probe_camera_id} local ${candidate.probe_track_id}`} /><span>↔</span><CandidateEvidence src={candidate.galleryImageUrl} label={`${candidate.gallery_camera_id} local ${candidate.gallery_track_id}`} /></div><div><strong>{candidate.probe_camera_id}/local-{candidate.probe_track_id}</strong><span>↔ {candidate.gallery_camera_id}/local-{candidate.gallery_track_id}</span></div><div className={candidate.status === "review" ? "candidate-score candidate-review" : "candidate-score"}><strong>{Math.round(candidate.similarity * 100)}%</strong><small>{candidate.status === "review" ? "manual review" : "below threshold"}</small></div></div>)}</div> : <div className="reid-empty">No candidates have been generated yet. Run the updated two-stream pipeline to populate this panel.</div>}
+      <div className="reid-heading"><div><span className="eyebrow">CROSS-CAMERA REVIEW</span><h3>Selected potential matches</h3></div><span className="subtle-pill">{reid?.oneToOneSuggestions ?? 0} one-to-one links</span></div>
+      <p className="reid-method">A frame is one image from the video. A local ID is a temporary track in one camera. These are the highest-scoring non-overlapping links at or above the {reid?.candidateThreshold ? `${Math.round(reid.candidateThreshold * 100)}%` : "configured"} review threshold. Method: {reid?.method ?? "Not generated"}.</p>
+      {candidates.length ? <div className="candidate-list">{candidates.map((candidate, index) => <div className="candidate-row" key={`${candidate.probe_camera_id}-${candidate.probe_track_id}-${candidate.gallery_camera_id}-${candidate.gallery_track_id}-${index}`}><div className="candidate-evidence"><CandidateEvidence src={candidate.probeImageUrl} label={`${candidate.probe_camera_id} local ${candidate.probe_track_id}`} /><span>↔</span><CandidateEvidence src={candidate.galleryImageUrl} label={`${candidate.gallery_camera_id} local ${candidate.gallery_track_id}`} /></div><div><strong>{candidate.probe_camera_id}/local-{candidate.probe_track_id}</strong><span>↔ {candidate.gallery_camera_id}/local-{candidate.gallery_track_id}</span></div><div className="candidate-score candidate-review"><strong>{Math.round(candidate.similarity * 100)}%</strong><small>manual review</small></div></div>)}</div> : <div className="reid-empty">No pairs met the review threshold for this run.</div>}
       <p className="reid-warning"><CircleAlert size={14} /> {reid?.warning} These are not verified identities and must not be used to make decisions about people.</p>
     </section>
   );
+}
+
+function CrossCameraConclusion({ reid }) {
+  if (!reid) return null;
+  const threshold = Math.round((reid.candidateThreshold ?? 0) * 100);
+  return <section className="card cross-camera-card">
+    <div className="card-heading"><div><span className="eyebrow">CROSS-CAMERA CONCLUSION</span><h2>{number(reid.oneToOneSuggestions)} potential cross-view matches</h2><p>One-to-one, highest-scoring visual-similarity links selected from the two camera-local track lists.</p></div><span className="subtle-pill">Manual review required</span></div>
+    <div className="cross-camera-metrics"><div><span>Potential matches</span><strong>{number(reid.oneToOneSuggestions)}</strong><small>non-overlapping track links</small></div><div><span>Candidate pairs</span><strong>{number(reid.candidatePairsAboveThreshold)}</strong><small>at or above the threshold</small></div><div><span>Similarity threshold</span><strong>{threshold}%</strong><small>HSV appearance baseline</small></div><div><span>Mean selected similarity</span><strong>{Math.round((reid.meanSimilarity ?? 0) * 100)}%</strong><small>of the potential links</small></div></div>
+    <p className="cross-camera-note"><CircleAlert size={14} /> This is the project’s strongest available cross-camera conclusion: these are people who look similar enough to review, not confirmed identities. Different views, lighting, clothing similarities, and track fragmentation can create false links.</p>
+  </section>;
 }
 
 function AlertHistory({ alerts }) {
@@ -367,6 +377,8 @@ export default function DashboardClient() {
               <MetricCard icon={Gauge} label={run.isMulti ? "Aggregate throughput" : "Processing speed"} value={`${number(metrics.processingFps, 2)} FPS`} note={run.isMulti ? "Combined speed across both feeds" : `${number(metrics.duration, 1)} seconds of compute`} />
               <MetricCard icon={Cpu} label="Local trajectory IDs" value={number(metrics.uniqueTracks)} note={run.isMulti ? "Camera-local lifetime IDs, not people" : `${number(metrics.averageConfidence * 100, 1)}% mean detection confidence`} />
             </div>
+
+            {run.isMulti && <CrossCameraConclusion reid={run.reid} />}
 
             <div className="content-grid">
               <section id="video-runs" className="card video-card">

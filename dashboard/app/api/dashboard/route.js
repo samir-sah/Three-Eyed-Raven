@@ -42,6 +42,32 @@ function readJsonLines(filePath) {
     });
 }
 
+function summarizeCrossCameraCandidates(candidates, threshold) {
+  const accepted = (candidates ?? [])
+    .filter((candidate) => Number(candidate.similarity) >= threshold)
+    .sort((first, second) => Number(second.similarity) - Number(first.similarity));
+  const usedProbeTracks = new Set();
+  const usedGalleryTracks = new Set();
+  const oneToOneSuggestions = [];
+  for (const candidate of accepted) {
+    const probe = `${candidate.probe_camera_id}:${candidate.probe_track_id}`;
+    const gallery = `${candidate.gallery_camera_id}:${candidate.gallery_track_id}`;
+    if (usedProbeTracks.has(probe) || usedGalleryTracks.has(gallery)) continue;
+    usedProbeTracks.add(probe);
+    usedGalleryTracks.add(gallery);
+    oneToOneSuggestions.push(candidate);
+  }
+  const meanSimilarity = oneToOneSuggestions.length
+    ? oneToOneSuggestions.reduce((total, candidate) => total + Number(candidate.similarity), 0) / oneToOneSuggestions.length
+    : 0;
+  return {
+    candidatePairsAboveThreshold: accepted.length,
+    oneToOneSuggestions: oneToOneSuggestions.length,
+    meanSimilarity,
+    selectedCandidates: oneToOneSuggestions,
+  };
+}
+
 function sampleTimeline(frameCounts) {
   if (frameCounts.length <= 12) return frameCounts;
   const step = Math.max(1, Math.floor(frameCounts.length / 12));
@@ -227,6 +253,9 @@ function readMultiRun(runId) {
   const summary = safeJson(summaryPath, {});
   const reidReport = safeJson(path.join(runDirectory, "reid_candidates.json"), { summary: {}, candidates: [] });
   const fallbackModel = summary.config?.model;
+  const candidateThreshold = Number(reidReport.summary?.candidate_threshold ?? 0.72);
+  const crossCameraSummary = summarizeCrossCameraCandidates(reidReport.candidates, candidateThreshold);
+  const { selectedCandidates, ...crossCameraMetrics } = crossCameraSummary;
   const streams = (summary.cameras ?? []).map((camera) => {
     const cameraDirectory = path.join(runDirectory, camera.camera_id);
     const observations = readJsonLines(path.join(cameraDirectory, "observations.jsonl"));
@@ -270,7 +299,7 @@ function readMultiRun(runId) {
   const alerts = streams
     .flatMap((stream) => stream.alerts.map((alert) => ({ ...alert, cameraId: stream.id, cameraLabel: stream.label })))
     .sort((first, second) => (second.timestamp_seconds ?? 0) - (first.timestamp_seconds ?? 0));
-  const candidates = (reidReport.candidates ?? []).slice(0, 3).map((candidate) => {
+  const candidates = selectedCandidates.slice(0, 6).map((candidate) => {
     const cropUrl = (cropPath) => {
       if (!cropPath) return null;
       const fileName = path.basename(cropPath);
@@ -294,8 +323,9 @@ function readMultiRun(runId) {
     streams,
     reid: {
       method: reidReport.summary?.method ?? "Not generated yet",
-      candidateThreshold: reidReport.summary?.candidate_threshold ?? null,
+      candidateThreshold,
       reviewCandidates: reidReport.summary?.review_candidates ?? 0,
+      ...crossCameraMetrics,
       warning: reidReport.summary?.warning ?? "Run the updated two-stream pipeline to generate review candidates.",
       candidates,
     },
