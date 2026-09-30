@@ -63,15 +63,33 @@ function readTrainingProgress() {
   const completed = /\d+ epochs completed in/.test(text);
   const running = !completed && Date.now() - latest.modifiedAt.getTime() < 120000;
   const lastLine = text.split(/\r?\n/).filter(Boolean).at(-1) ?? "Preparing dataset and model";
+  const runName = path.basename(path.dirname(latest.file));
+  const resultsPath = findFiles(TRAINING_ROOT, "results.csv")
+    .filter((file) => path.basename(path.dirname(file)) === runName)
+    .map((file) => ({ file, modifiedAt: statSync(file).mtime }))
+    .sort((first, second) => second.modifiedAt - first.modifiedAt)[0]?.file;
+  const rows = resultsPath ? readFileSync(resultsPath, "utf8").trim().split(/\r?\n/) : [];
+  const headers = rows.length > 1 ? rows[0].split(",").map((value) => value.trim()) : [];
+  const values = rows.length > 1 ? rows.at(-1).split(",").map((value) => Number(value.trim())) : [];
+  const metric = (name) => {
+    const value = values[headers.indexOf(name)];
+    return Number.isFinite(value) ? value : null;
+  };
 
   return {
-    name: path.basename(path.dirname(latest.file)).replaceAll("_", " "),
+    name: runName.replaceAll("_", " "),
     updatedAt: latest.modifiedAt.toISOString(),
     currentEpoch: completed ? totalEpochs : currentEpoch,
     totalEpochs,
     progress: totalEpochs ? Math.round((completed ? totalEpochs : currentEpoch) / totalEpochs * 100) : 0,
     status: completed ? "completed" : running ? "running" : "paused",
     lastLine: lastLine.replace(/\x1B\[[0-?]*[ -\/]*[@-~]/g, "").slice(-180),
+    metrics: {
+      precision: metric("metrics/precision(B)"),
+      recall: metric("metrics/recall(B)"),
+      map50: metric("metrics/mAP50(B)"),
+      map5095: metric("metrics/mAP50-95(B)"),
+    },
   };
 }
 
