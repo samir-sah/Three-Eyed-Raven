@@ -148,6 +148,11 @@ function ReIdCandidates({ reid }) {
   );
 }
 
+function AlertHistory({ alerts }) {
+  if (!alerts?.length) return <p className="muted">No zone threshold crossings in this run.</p>;
+  return <div className="alert-history">{alerts.slice(0, 5).map((alert, index) => <div className="alert-history-row" key={`${alert.cameraId}-${alert.zone_id}-${alert.frame_index}-${index}`}><span className="alert-history-icon"><CircleAlert size={14} /></span><div><strong>{alert.zone_id.replaceAll("_", " ")}</strong><small>{alert.cameraLabel} · frame {number(alert.frame_index)}</small></div><span>{number(alert.count)}/{number(alert.threshold)}</span></div>)}</div>;
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [selectedRun, setSelectedRun] = useState("");
@@ -236,7 +241,8 @@ export default function DashboardClient() {
                 <div className="track-list">
                   {run.isMulti ? run.streams.map((stream) => <div className="track-row" key={stream.id}><span className="track-avatar"><Video size={14} /></span><div><strong>{stream.label}</strong><small>{number(stream.frames)} frames · peak {number(stream.peakCount)} people</small></div><div className="confidence"><strong>{number(stream.localTracks)}</strong><small>local IDs</small></div></div>) : run.tracks.length ? run.tracks.map((track) => <div className="track-row" key={track.id}><span className="track-avatar">{track.id}</span><div><strong>local-{track.id}</strong><small>Frames {track.firstFrame}–{track.lastFrame}</small></div><div className="confidence"><strong>{number(track.meanConfidence * 100, 0)}%</strong><small>confidence</small></div></div>) : <p className="muted">No tracked-person observations were recorded.</p>}
                 </div>
-                <div className="alert-box"><CircleAlert size={18} /><div><strong>{metrics.alertCount ? `${metrics.alertCount} crowd alert${metrics.alertCount === 1 ? "" : "s"}` : "No crowd alerts"}</strong><span>{metrics.alertCount ? "Threshold events are available in the event log." : "Zone threshold was not exceeded in this run."}</span></div></div>
+                <div className="alert-box"><CircleAlert size={18} /><div><strong>{metrics.alertCount ? `${metrics.alertCount} crowd alert${metrics.alertCount === 1 ? "" : "s"}` : "No crowd alerts"}</strong><span>{metrics.alertCount ? "Zone threshold crossings are recorded below." : "Zone threshold was not exceeded in this run."}</span></div></div>
+                {run.isMulti && <section className="alert-history-panel"><span className="eyebrow">ZONE EVENT LOG</span><AlertHistory alerts={run.alerts} /></section>}
               </section>
             </div>
 

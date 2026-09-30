@@ -15,12 +15,24 @@
     {
       "id": "aerial_1",
       "source": "data/aerial_crowd_pexels.mp4",
-      "zones": []
+      "zones": [
+        {
+          "id": "aerial_observation_area",
+          "points": [[0, 0], [2159, 0], [2159, 3839], [0, 3839]],
+          "occupancy_alert_threshold": 3
+        }
+      ]
     },
     {
       "id": "cctv_1",
       "source": "data/ground_crowd_pexels.mp4",
-      "zones": []
+      "zones": [
+        {
+          "id": "cctv_observation_area",
+          "points": [[0, 0], [2159, 0], [2159, 3839], [0, 3839]],
+          "occupancy_alert_threshold": 3
+        }
+      ]
     }
   ]
 }

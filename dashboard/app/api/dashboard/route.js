@@ -152,10 +152,14 @@ function readMultiRun(runId) {
       peakFrame,
       averageConfidence,
       alertCount: alerts.length,
+      alerts: alerts.slice(-5).reverse(),
     };
   });
   const observationWeight = streams.reduce((total, stream) => total + stream.frames, 0) || 1;
   const busiestStream = streams.reduce((best, stream) => (stream.peakCount > best.peakCount ? stream : best), { peakCount: 0, peakFrame: 0 });
+  const alerts = streams
+    .flatMap((stream) => stream.alerts.map((alert) => ({ ...alert, cameraId: stream.id, cameraLabel: stream.label })))
+    .sort((first, second) => (second.timestamp_seconds ?? 0) - (first.timestamp_seconds ?? 0));
   const candidates = (reidReport.candidates ?? []).slice(0, 6).map((candidate) => {
     const cropUrl = (cropPath) => {
       if (!cropPath) return null;
@@ -198,7 +202,7 @@ function readMultiRun(runId) {
     },
     timeline: [],
     tracks: [],
-    alerts: [],
+    alerts,
   };
 }
 

@@ -1,15 +1,15 @@
-# Crowd Tracking Baseline
+# Three Eyed Raven — Crowd Tracking Platform
 
-This is the first runnable implementation slice of the project: one video source is processed with YOLO person detection and ByteTrack local tracking. It produces an annotated MP4 (optional), per-frame JSONL events, and a run summary.
+This runnable project processes recorded aerial and CCTV video with YOLO person detection and ByteTrack local tracking. It produces annotated outputs, per-frame JSONL events, zone-threshold alerts, cross-camera review candidates, and a local dashboard for demonstration.
 
 ## Current scope
 
-- Recorded video input only; RTSP/CCTV and drone feeds come after this offline baseline is evaluated.
+- Recorded video input only; live RTSP/CCTV and drone feeds come after this offline baseline is evaluated.
 - `person` detections only (COCO class 0).
 - Stable **local** track IDs within one camera stream. A track ID is not a verified real-world identity.
 - Polygon-zone occupancy and threshold alerts.
-
-Cross-camera person re-identification and the operator dashboard are deliberately not included in this first slice. They depend on reliable per-camera tracking and a measured evaluation dataset.
+- Cross-camera appearance ranking is review-only; it never merges IDs or asserts a real-world identity.
+- A Next.js dashboard reads the local artifacts and presents playback, metrics, alerts, and review evidence.
 
 ## Setup
 
@@ -51,7 +51,7 @@ python -m unittest discover -s tests -v
 
 1. Evaluate detection and tracking on VisDrone/MOT17 rather than relying on a visual demo.
 2. Add a Re-ID experiment service that returns confidence-ranked candidates, never forced identities.
-3. Add FastAPI persistence and a dashboard after the event schema is stable.
+3. Add a persistent API service and authenticated operator workflow after the event schema is stable.
 
 ## Two-stream baseline
 
@@ -64,6 +64,8 @@ python -m crowd_tracker.multi_cli --config multi_config.json
 ```
 
 Each camera gets its own annotated video, observations, alerts, and summary under `artifacts/two_stream_demo`.
+
+The sample two-stream configuration includes a full-frame observation zone for each camera and a demo threshold of three local tracks. In a deployment, replace these rectangles and thresholds with site-specific zones after calibrating each camera view.
 
 The same run emits `reid_candidates.json`: an explainable HSV appearance-matching baseline that ranks possible cross-camera matches. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification. A trained aerial-ground Re-ID model is the next research upgrade after this baseline is evaluated.
 
