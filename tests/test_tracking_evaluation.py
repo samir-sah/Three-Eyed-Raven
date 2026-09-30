@@ -18,6 +18,7 @@ class TrackingEvaluationTests(unittest.TestCase):
         self.assertEqual(metrics["recall"], 1.0)
         self.assertEqual(metrics["mota"], 1.0)
         self.assertEqual(metrics["id_switches"], 0)
+        self.assertEqual(metrics["idf1"], 1.0)
 
     def test_identity_switch_and_false_positive_are_counted(self):
         ground_truth = [
@@ -33,3 +34,21 @@ class TrackingEvaluationTests(unittest.TestCase):
         self.assertEqual(metrics["id_switches"], 1)
         self.assertEqual(metrics["false_positives"], 1)
         self.assertEqual(metrics["mota"], 0.0)
+        self.assertEqual(metrics["idf1"], 0.4)
+
+    def test_global_identity_assignment_penalises_fragmented_tracks(self):
+        ground_truth = [
+            LabeledBox(0, "a", (0, 0, 10, 10)),
+            LabeledBox(1, "a", (0, 0, 10, 10)),
+            LabeledBox(0, "b", (20, 0, 30, 10)),
+            LabeledBox(1, "b", (20, 0, 30, 10)),
+        ]
+        predictions = [
+            LabeledBox(0, "local_1", (0, 0, 10, 10)),
+            LabeledBox(1, "local_2", (0, 0, 10, 10)),
+            LabeledBox(0, "local_3", (20, 0, 30, 10)),
+            LabeledBox(1, "local_3", (20, 0, 30, 10)),
+        ]
+        metrics = evaluate_tracking(ground_truth, predictions)
+        self.assertEqual(metrics["id_true_positives"], 3)
+        self.assertEqual(metrics["idf1"], 0.75)
