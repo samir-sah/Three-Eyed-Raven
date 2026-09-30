@@ -30,7 +30,7 @@ The detector smoke run established that CUDA, labels, validation, logging, and c
 
 1. **Full detector experiment.** Train/validate for an agreed schedule (for example 50 epochs), preserve the run directory, and compare the best checkpoint against the COCO baseline on a held-out aerial set.
 2. **Trained cross-camera Re-ID.** PRAI-1581, CARGO, and AG-ReID require their respective access/licence conditions. Obtain them legally, prepare a manifest, train the supplied Siamese model, then report Rank-1/5/10 and mAP. The application must keep matching as operator review, never automatic identity confirmation.
-3. **MOT17 full benchmark.** Evaluate all agreed sequences and detector variants, then record aggregate MOTA, MOTP, IDF1, ID switches, and latency. HOTA remains a future extension. The current 120-frame run is intentionally a small sanity benchmark.
+3. **MOT17 full benchmark.** Evaluate all agreed sequences and detector variants, then record aggregate MOTA, MOTP, IDF1, HOTA, ID switches, and latency. The current 120-frame run is intentionally a small sanity benchmark.
 4. **Authorised live field validation.** Calibrate zones, source credentials, retention policy, alert thresholds, permission notices, and test with real drone/CCTV feeds only after approval.
 5. **Academic finalisation.** Replace the baseline values in the report/slides with results from the complete experiments, cite data licences, and rehearse the live demo fallback.
 

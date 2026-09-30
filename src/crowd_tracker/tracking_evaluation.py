@@ -83,6 +83,55 @@ def _maximum_weight_track_assignment(pair_counts: dict[tuple[str, str], int]) ->
     return sum(weights[row - 1][column - 1] for column, row in enumerate(matching[1:], start=1) if row)
 
 
+def _hota_at_threshold(
+    ground_truth: list[LabeledBox],
+    predictions: list[LabeledBox],
+    gt_by_frame: dict[int, list[LabeledBox]],
+    prediction_by_frame: dict[int, list[LabeledBox]],
+    threshold: float,
+) -> float:
+    """Compute HOTA at one IoU threshold from detection and association accuracy."""
+    matches: list[tuple[str, str]] = []
+    false_positives = false_negatives = 0
+    for frame_index in sorted(set(gt_by_frame) | set(prediction_by_frame)):
+        frame_gt = gt_by_frame[frame_index]
+        frame_predictions = prediction_by_frame[frame_index]
+        pairs = [
+            (iou(gt.bbox_xyxy, prediction.bbox_xyxy), gt_index, prediction_index)
+            for gt_index, gt in enumerate(frame_gt)
+            for prediction_index, prediction in enumerate(frame_predictions)
+        ]
+        used_gt: set[int] = set()
+        used_predictions: set[int] = set()
+        for overlap, gt_index, prediction_index in sorted(pairs, reverse=True):
+            if overlap < threshold or gt_index in used_gt or prediction_index in used_predictions:
+                continue
+            used_gt.add(gt_index)
+            used_predictions.add(prediction_index)
+            matches.append((frame_gt[gt_index].track_id, frame_predictions[prediction_index].track_id))
+        false_negatives += len(frame_gt) - len(used_gt)
+        false_positives += len(frame_predictions) - len(used_predictions)
+
+    true_positives = len(matches)
+    if not true_positives:
+        return 0.0
+    detection_accuracy = true_positives / (true_positives + false_positives + false_negatives)
+    gt_counts: dict[str, int] = defaultdict(int)
+    prediction_counts: dict[str, int] = defaultdict(int)
+    pair_counts: dict[tuple[str, str], int] = defaultdict(int)
+    for box in ground_truth:
+        gt_counts[box.track_id] += 1
+    for box in predictions:
+        prediction_counts[box.track_id] += 1
+    for pair in matches:
+        pair_counts[pair] += 1
+    association_accuracy = sum(
+        pair_counts[pair] / (gt_counts[pair[0]] + prediction_counts[pair[1]] - pair_counts[pair])
+        for pair in matches
+    ) / true_positives
+    return (detection_accuracy * association_accuracy) ** 0.5
+
+
 def iou(first: tuple[float, float, float, float], second: tuple[float, float, float, float]) -> float:
     """Return intersection-over-union for two XYXY boxes."""
     left, top = max(first[0], second[0]), max(first[1], second[1])
@@ -156,6 +205,11 @@ def evaluate_tracking(
     id_precision = id_true_positives / (id_true_positives + id_false_positives) if id_true_positives + id_false_positives else 0.0
     id_recall = id_true_positives / (id_true_positives + id_false_negatives) if id_true_positives + id_false_negatives else 0.0
     idf1 = 2 * id_precision * id_recall / (id_precision + id_recall) if id_precision + id_recall else 0.0
+    hota_thresholds = [round(value / 100, 2) for value in range(5, 100, 5)]
+    hota = sum(
+        _hota_at_threshold(ground_truth, predictions, gt_by_frame, prediction_by_frame, threshold)
+        for threshold in hota_thresholds
+    ) / len(hota_thresholds)
     return {
         "iou_threshold": iou_threshold,
         "ground_truth_boxes": total_ground_truth,
@@ -170,6 +224,7 @@ def evaluate_tracking(
         "id_precision": round(id_precision, 4),
         "id_recall": round(id_recall, 4),
         "idf1": round(idf1, 4),
+        "hota": round(hota, 4),
         "precision": round(precision, 4),
         "recall": round(recall, 4),
         "f1": round(f1, 4),

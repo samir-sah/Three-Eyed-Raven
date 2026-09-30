@@ -162,7 +162,7 @@ function EvaluationResults({ evaluation }) {
   if (!evaluation) return null;
   const metrics = [
     ["Precision", evaluation.precision], ["Recall", evaluation.recall], ["F1", evaluation.f1],
-    ["MOTA", evaluation.mota], ["MOTP", evaluation.motp], ["IDF1", evaluation.idf1], ["ID switches", evaluation.id_switches],
+    ["MOTA", evaluation.mota], ["MOTP", evaluation.motp], ["IDF1", evaluation.idf1], ["HOTA", evaluation.hota], ["ID switches", evaluation.id_switches],
   ];
   return <section className="card evaluation-card"><div className="card-heading"><div><span className="eyebrow">BENCHMARK EVALUATION</span><h2>Recorded tracking metrics</h2><p>IoU threshold {Math.round((evaluation.iou_threshold ?? 0.5) * 100)}% · Ground truth: {number(evaluation.ground_truth_boxes)} boxes</p></div><span className="subtle-pill">Measured baseline</span></div><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></section>;
 }

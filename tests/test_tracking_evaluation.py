@@ -19,6 +19,7 @@ class TrackingEvaluationTests(unittest.TestCase):
         self.assertEqual(metrics["mota"], 1.0)
         self.assertEqual(metrics["id_switches"], 0)
         self.assertEqual(metrics["idf1"], 1.0)
+        self.assertEqual(metrics["hota"], 1.0)
 
     def test_identity_switch_and_false_positive_are_counted(self):
         ground_truth = [
@@ -52,3 +53,4 @@ class TrackingEvaluationTests(unittest.TestCase):
         metrics = evaluate_tracking(ground_truth, predictions)
         self.assertEqual(metrics["id_true_positives"], 3)
         self.assertEqual(metrics["idf1"], 0.75)
+        self.assertAlmostEqual(metrics["hota"], 0.866, places=3)

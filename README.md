@@ -49,7 +49,7 @@ python -m unittest discover -s tests -v
 
 ## Tracking benchmark evaluation
 
-Use a labeled JSONL file with stable ground-truth IDs to evaluate one camera sequence. Prediction records use the project's existing `observations.jsonl` format. The evaluator reports precision, recall, F1, MOTA, MOTP, IDF1, false positives/negatives, and local-ID switches at the chosen IoU threshold.
+Use a labeled JSONL file with stable ground-truth IDs to evaluate one camera sequence. Prediction records use the project's existing `observations.jsonl` format. The evaluator reports precision, recall, F1, MOTA, MOTP, IDF1, HOTA, false positives/negatives, and local-ID switches at the chosen IoU threshold.
 
 ```bat
 set PYTHONPATH=src
