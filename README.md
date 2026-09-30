@@ -98,6 +98,8 @@ Copy `live_stream.example.json` to the ignored `config.json` only after replacin
 
 For integrations that need non-blocking capture, `crowd_tracker.acquisition` provides bounded threaded `BoundedCapture`, frame preprocessing, and timestamp pairing. The existing offline multi-stream pipeline remains the reliable recorded-demo path; use the acquisition primitives when wiring authorised live sources into a production worker.
 
+Each newly completed run now records a per-stage latency profile (detection/tracking, crowd analytics, rendering, and Re-ID review ranking where applicable). The dashboard’s **Pipeline profiling** panel exposes mean and p95 stage latency for performance reporting.
+
 ## Dataset preparation
 
 Convert MOTChallenge `gt.txt` labels into the evaluator's JSONL format, then compare them with this project's `observations.jsonl` output:

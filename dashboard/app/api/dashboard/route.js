@@ -108,6 +108,7 @@ function readRun(runId) {
       source: summary.source ?? "—",
     },
     timeline: sampleTimeline(frameCounts),
+    latencyProfile: summary.latency_profile ?? [],
     tracks: stableTracks,
     alerts: alerts.slice(-5).reverse(),
   };
@@ -201,6 +202,7 @@ function readMultiRun(runId) {
       source: "Independent aerial and ground feeds",
     },
     timeline: [],
+    latencyProfile: summary.latency_profile ?? [],
     tracks: [],
     alerts,
   };

@@ -12,6 +12,7 @@ import cv2
 from .analytics import ZoneAnalytics
 from .config import AppConfig
 from .models import TrackObservation
+from .profiling import StageProfiler
 from .storage import RunStore
 from .tracker import ByteTrackPersonTracker, TrackedPerson
 
@@ -51,6 +52,7 @@ class OfflinePipeline:
         alert_count = 0
         reconnects = 0
         started = time.perf_counter()
+        profiler = StageProfiler()
 
         try:
             with _open_jsonl(observations_path) as observation_file, _open_jsonl(alerts_path) as alert_file:
@@ -69,18 +71,21 @@ class OfflinePipeline:
                     if read % self.config.frame_stride != 0:
                         continue
                     timestamp = capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-                    tracked = self.tracker.track(frame)
+                    with profiler.measure("detection_and_tracking"):
+                        tracked = self.tracker.track(frame)
                     observations = self._observations(tracked, processed, timestamp)
                     unique_track_ids.update(item.track_id for item in observations)
                     for item in observations:
                         observation_file.write(json.dumps(item.as_dict()) + "\n")
 
-                    alerts = self.analytics.alerts(observations)
+                    with profiler.measure("crowd_analytics"):
+                        alerts = self.analytics.alerts(observations)
                     for alert in alerts:
                         alert_file.write(json.dumps(alert.as_dict()) + "\n")
                     alert_count += len(alerts)
 
-                    self._draw(frame, tracked, observations, alerts)
+                    with profiler.measure("rendering"):
+                        self._draw(frame, tracked, observations, alerts)
                     if writer is not None:
                         writer.write(frame)
                     if self.config.display:
@@ -111,6 +116,7 @@ class OfflinePipeline:
             "unique_local_track_ids": len(unique_track_ids),
             "alert_count": alert_count,
             "reconnects": reconnects,
+            "latency_profile": profiler.summary(),
             "config": self.config.as_dict(),
         }
         (self.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")

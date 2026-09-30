@@ -153,6 +153,11 @@ function AlertHistory({ alerts }) {
   return <div className="alert-history">{alerts.slice(0, 5).map((alert, index) => <div className="alert-history-row" key={`${alert.cameraId}-${alert.zone_id}-${alert.frame_index}-${index}`}><span className="alert-history-icon"><CircleAlert size={14} /></span><div><strong>{alert.zone_id.replaceAll("_", " ")}</strong><small>{alert.cameraLabel} · frame {number(alert.frame_index)}</small></div><span>{number(alert.count)}/{number(alert.threshold)}</span></div>)}</div>;
 }
 
+function LatencyProfile({ stages }) {
+  if (!stages?.length) return <p className="muted">No stage timing profile is available for this historical run.</p>;
+  return <div className="latency-list">{stages.map((stage) => <div className="latency-row" key={stage.stage}><div><strong>{stage.stage.replaceAll("_", " ")}</strong><small>{number(stage.calls)} calls · p95 {number(stage.p95_ms, 1)} ms</small></div><span>{number(stage.mean_ms, 1)} ms</span></div>)}</div>;
+}
+
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
@@ -257,6 +262,8 @@ export default function DashboardClient() {
               <OccupancyChart timeline={run.timeline} />
               <div className="chart-labels"><span>Start</span><span>Peak: {number(metrics.peakCount)} people</span><span>End</span></div>
             </section>
+
+            <section className="card latency-card"><div className="card-heading"><div><span className="eyebrow">PIPELINE PROFILING</span><h2>Stage latency breakdown</h2><p>Measured during this completed run; values are per stage call.</p></div><span className="subtle-pill">milliseconds</span></div><LatencyProfile stages={run.latencyProfile} /></section>
 
             <section className="development-row">
               <article className="card development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></article>

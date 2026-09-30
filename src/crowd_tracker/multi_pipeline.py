@@ -13,6 +13,7 @@ import cv2
 from .analytics import ZoneAnalytics
 from .config import CameraStreamConfig, MultiStreamConfig
 from .models import TrackObservation
+from .profiling import StageProfiler
 from .reid import AppearanceGallery, CrossCameraMatcher
 from .tracker import ByteTrackPersonTracker, TrackedPerson
 from .storage import RunStore
@@ -54,6 +55,7 @@ class MultiStreamPipeline:
             candidate_threshold=config.reid_candidate_threshold,
             top_k=config.reid_top_k,
         )
+        self.profiler = StageProfiler()
 
     def run(self) -> dict:
         states = [self._open_camera(camera) for camera in self.config.cameras]
@@ -73,8 +75,9 @@ class MultiStreamPipeline:
 
         elapsed = max(time.perf_counter() - started, 1e-9)
         cameras = [self._camera_summary(state, elapsed) for state in states]
-        thumbnail_paths = self.gallery.write_thumbnails(str(self.output_dir / "reid_crops"))
-        candidates = self.matcher.rank(self.gallery.descriptors(thumbnail_paths))
+        with self.profiler.measure("reid_review_ranking"):
+            thumbnail_paths = self.gallery.write_thumbnails(str(self.output_dir / "reid_crops"))
+            candidates = self.matcher.rank(self.gallery.descriptors(thumbnail_paths))
         reid_summary = {
             "method": "HSV appearance baseline",
             "candidate_threshold": self.config.reid_candidate_threshold,
@@ -94,6 +97,7 @@ class MultiStreamPipeline:
             "alert_count": sum(camera["alert_count"] for camera in cameras),
             "cameras": cameras,
             "reid": reid_summary,
+            "latency_profile": self.profiler.summary(),
             "config": self.config.as_dict(),
         }
         (self.output_dir / "summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
@@ -157,19 +161,22 @@ class MultiStreamPipeline:
             return
 
         timestamp = state.capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-        tracked = state.tracker.track(frame)
+        with self.profiler.measure("detection_and_tracking"):
+            tracked = state.tracker.track(frame)
         observations = self._observations(state, tracked, timestamp)
         state.unique_track_ids.update(item.track_id for item in observations)
         for observation in observations:
             state.observations_file.write(json.dumps(observation.as_dict()) + "\n")
             self.gallery.add(frame, observation)
 
-        alerts = state.analytics.alerts(observations)
+        with self.profiler.measure("crowd_analytics"):
+            alerts = state.analytics.alerts(observations)
         for alert in alerts:
             state.alerts_file.write(json.dumps(alert.as_dict()) + "\n")
         state.alert_count += len(alerts)
 
-        self._draw(state, frame, tracked, observations, alerts)
+        with self.profiler.measure("rendering"):
+            self._draw(state, frame, tracked, observations, alerts)
         if state.writer is not None:
             state.writer.write(frame)
         state.processed += 1
