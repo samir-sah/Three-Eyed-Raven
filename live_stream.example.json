@@ -1,0 +1,16 @@
+{
+  "source": "rtsp://camera-host:554/stream",
+  "output_dir": "artifacts/live_camera_run",
+  "model": "yolo11n.pt",
+  "device": "auto",
+  "confidence_threshold": 0.35,
+  "iou_threshold": 0.5,
+  "frame_stride": 1,
+  "max_frames": null,
+  "display": false,
+  "save_video": false,
+  "tracker": "bytetrack.yaml",
+  "reconnect_attempts": 3,
+  "reconnect_delay_seconds": 2.0,
+  "zones": []
+}

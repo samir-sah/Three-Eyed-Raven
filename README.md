@@ -87,6 +87,15 @@ Set `CROWD_TRACKER_API_KEY` before making the service available to any other dev
 
 The tracker makes only the configured number of reconnect attempts and then completes the run with reconnect metadata. Do not place credentials in committed configuration files; keep private stream URLs in ignored `config.json` or environment-managed configuration.
 
+Before running inference against a real stream, run a source preflight that reports readability and resolution while redacting any URL credential in its output:
+
+```bat
+set PYTHONPATH=src
+python -m crowd_tracker.preflight_cli --source "rtsp://camera-host:554/stream"
+```
+
+Copy `live_stream.example.json` to the ignored `config.json` only after replacing the placeholder source and calibrating zones. See [FIELD_VALIDATION.md](FIELD_VALIDATION.md) for the field-validation and production sign-off checklist.
+
 ## Dataset preparation
 
 Convert MOTChallenge `gt.txt` labels into the evaluator's JSONL format, then compare them with this project's `observations.jsonl` output:
