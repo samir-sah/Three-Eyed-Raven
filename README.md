@@ -96,6 +96,8 @@ python -m crowd_tracker.preflight_cli --source "rtsp://camera-host:554/stream"
 
 Copy `live_stream.example.json` to the ignored `config.json` only after replacing the placeholder source and calibrating zones. See [FIELD_VALIDATION.md](FIELD_VALIDATION.md) for the field-validation and production sign-off checklist.
 
+For integrations that need non-blocking capture, `crowd_tracker.acquisition` provides bounded threaded `BoundedCapture`, frame preprocessing, and timestamp pairing. The existing offline multi-stream pipeline remains the reliable recorded-demo path; use the acquisition primitives when wiring authorised live sources into a production worker.
+
 ## Dataset preparation
 
 Convert MOTChallenge `gt.txt` labels into the evaluator's JSONL format, then compare them with this project's `observations.jsonl` output:
@@ -105,6 +107,8 @@ set PYTHONPATH=src
 python -m crowd_tracker.mot_import_cli --input path\to\gt.txt --output artifacts\ground_truth.jsonl
 python -m crowd_tracker.tracking_eval_cli --ground-truth artifacts\ground_truth.jsonl --predictions artifacts\your_run\observations.jsonl
 ```
+
+For VisDrone aerial detector fine-tuning, use the preparation and training commands in [DATASETS.md](DATASETS.md). The project now includes a single-class VisDrone-to-YOLO converter and a reproducible Ultralytics training entry point; training starts only after the official data is acquired and split correctly.
 
 ## Persistence and containers
 

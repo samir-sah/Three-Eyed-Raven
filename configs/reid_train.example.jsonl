@@ -1,0 +1,4 @@
+{"path":"images/person_001_a.jpg","person_id":"001","camera_id":"aerial_1","split":"train"}
+{"path":"images/person_001_b.jpg","person_id":"001","camera_id":"cctv_1","split":"train"}
+{"path":"images/person_002_a.jpg","person_id":"002","camera_id":"aerial_1","split":"train"}
+{"path":"images/person_002_b.jpg","person_id":"002","camera_id":"cctv_1","split":"train"}

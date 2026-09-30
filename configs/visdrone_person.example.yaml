@@ -1,0 +1,6 @@
+# Replace paths with the prepared VisDrone DET train and validation split paths.
+path: data/processed/visdrone_person
+train: train/images
+val: val/images
+names:
+  0: person
