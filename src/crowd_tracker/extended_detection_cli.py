@@ -87,7 +87,7 @@ def clean_metrics(metrics) -> dict:
     return {key: float(value) for key, value in metrics.items() if math.isfinite(float(value))}
 
 
-def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, size: int, batch: int, hours: float, smoke: bool) -> Path:
+def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, size: int, batch: int, hours: float, smoke: bool, learning_rate: float | None = None, warmup_epochs: float = 1, workers: int = 2) -> Path:
     import torch
     from ultralytics import YOLO
 
@@ -123,9 +123,9 @@ def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, s
         model.train(
             data=str(data), project=str(directory), name=name, exist_ok=False,
             epochs=1 if smoke else 150, time=None if smoke else hours,
-            imgsz=size, batch=batch, device=0, workers=2,
-            optimizer="AdamW", lr0=0.0001 if size == 640 else 0.00005,
-            lrf=0.05, cos_lr=True, warmup_epochs=1, patience=20,
+            imgsz=size, batch=batch, device=0, workers=workers,
+            optimizer="AdamW", lr0=learning_rate if learning_rate is not None else (0.0001 if size == 640 else 0.00005),
+            lrf=0.05, cos_lr=True, warmup_epochs=warmup_epochs, patience=20,
             save=True, save_period=10, seed=42, deterministic=True,
             cache=False, amp=True, plots=False, close_mosaic=0,
             mosaic=0.5, mixup=0.0, max_det=1000, fraction=0.005 if smoke else 1.0,
@@ -146,7 +146,7 @@ def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, s
         torch.cuda.empty_cache()
 
 
-def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, directory: Path, state: Status, *, augment: bool = False) -> dict:
+def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, directory: Path, state: Status, *, augment: bool = False, workers: int = 2) -> dict:
     import torch
     from ultralytics import YOLO
 
@@ -154,7 +154,7 @@ def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, 
     model = YOLO(str(checkpoint))
     try:
         metrics = model.val(data=str(data), split="val", imgsz=size, batch=1, device=0,
-                            workers=2, plots=False, save_json=False, conf=0.001, max_det=1000, augment=augment,
+                            workers=workers, plots=False, save_json=False, conf=0.001, max_det=1000, augment=augment,
                             project=str(directory / "evaluation"), name=name, exist_ok=False)
         images = sorted((dataset / "val" / "images").glob("*.jpg"))
         rows = []

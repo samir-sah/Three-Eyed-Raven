@@ -41,6 +41,8 @@ export default function TrainingPage() {
       <section className="card monitor-card" aria-live="polite">
         <div className="card-heading"><div><span className="eyebrow">CURRENT STATUS</span><h2>{experiment.status.replaceAll("_", " ")}</h2><p>{experiment.activeStage?.replaceAll("_", " ") || "Checking dataset and GPU"}</p></div><span className="subtle-pill">{finished ? "Finished" : "Updates every 10 seconds"}</span></div>
         <p>Last update: {new Date(experiment.updatedAt).toLocaleString()}</p>
+        <p>Experiment: {experiment.name}{experiment.architecture ? ` · ${experiment.architecture}` : ""}</p>
+        {Number.isFinite(experiment.target) && <p>Target: above {percent(experiment.target)} validation {experiment.targetMetric || "mAP50"}. {experiment.comparison ? (experiment.comparison.target_reached ? "Reached on validation; independent testing is still required." : "Not reached in this experiment.") : "Final result pending evaluation."}</p>}
         {stale && <p role="status">No update in over five minutes. Validation or slow disk access can delay updates; check the saved logs if this persists.</p>}
         {!finished && ["training", "validating"].includes(experiment.status) && <><p>Epoch {numeric(experiment.epoch)} · {numeric(experiment.batchesDone)} / {numeric(experiment.batchesTotal)} batches</p><progress value={progress} max="100" aria-label="Batches processed in current epoch" /></>}
         {experiment.status === "evaluating" && <p>Count evaluation: {numeric(experiment.evaluationImagesDone)} / {numeric(experiment.evaluationImagesTotal)} images</p>}
@@ -51,7 +53,7 @@ export default function TrainingPage() {
         <div className="card monitor-card"><span>Validation images</span><strong>{numeric(experiment.dataset?.val?.images)}</strong><small>Checkpoint selection and development evaluation</small></div>
         <div className="card monitor-card"><span>Training budget</span><strong>{numeric(experiment.budgetHours, 1)} hours</strong><small>Plus dataset checks and final evaluation</small></div>
       </section>
-      <section className="card monitor-card"><div className="card-heading"><div><span className="eyebrow">EXPERIMENTS</span><h2>640 px continuation → 960 px refinement</h2></div></div>
+      <section className="card monitor-card"><div className="card-heading"><div><span className="eyebrow">EXPERIMENTS</span><h2>{experiment.architecture ? `${experiment.architecture} training stages` : "Training stages"}</h2></div></div>
         <p>Each stage saves best and latest checkpoints after completed epochs. Early stopping can finish a stage before its time budget.</p>
         {experiment.stages?.map(stage => <div className="monitor-stage" key={stage.name}><div><strong>{stage.imgsz} px</strong><p>{stage.status} · {numeric(stage.epoch)} completed epochs · {numeric(stage.budgetHours, 1)} hour budget</p></div><div><span>Latest validation mAP50–95</span><strong>{percent(stage.metrics?.["metrics/mAP50-95(B)"])}</strong></div></div>)}
       </section>
