@@ -131,6 +131,8 @@ class MultiStreamConfig:
     reid_candidate_threshold: float = 0.72
     reid_top_k: int = 3
     reid_min_box_size: int = 32
+    reid_checkpoint: str | None = None
+    reid_image_size: int = 192
     reconnect_attempts: int = 3
     reconnect_delay_seconds: float = 2.0
 
@@ -152,6 +154,8 @@ class MultiStreamConfig:
             reid_candidate_threshold=raw.get("reid_candidate_threshold", 0.72),
             reid_top_k=raw.get("reid_top_k", 3),
             reid_min_box_size=raw.get("reid_min_box_size", 32),
+            reid_checkpoint=raw.get("reid_checkpoint"),
+            reid_image_size=raw.get("reid_image_size", 192),
             reconnect_attempts=raw.get("reconnect_attempts", 3),
             reconnect_delay_seconds=raw.get("reconnect_delay_seconds", 2.0),
         )
@@ -185,6 +189,10 @@ class MultiStreamConfig:
             raise ValueError("reid_top_k must be >= 1.")
         if self.reid_min_box_size < 8:
             raise ValueError("reid_min_box_size must be >= 8.")
+        if self.reid_checkpoint is not None and (not isinstance(self.reid_checkpoint, str) or not self.reid_checkpoint.strip()):
+            raise ValueError("reid_checkpoint must be a non-empty string when provided.")
+        if self.reid_image_size < 64:
+            raise ValueError("reid_image_size must be >= 64.")
         if self.reconnect_attempts < 0:
             raise ValueError("reconnect_attempts must be >= 0.")
         if self.reconnect_delay_seconds < 0:

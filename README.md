@@ -157,16 +157,18 @@ The top-level `model` is the default detector for every camera. A camera can opt
 
 For a genuine same-person, multi-view demo, use the EPFL laboratory sequence rather than unrelated videos. Its synchronized camera streams film the same area from different angles; the people in each view are the same participants. The videos are copyrighted by CVLab–EPFL and available for research use only, so they are deliberately excluded from this repository. Download two views from [EPFL's Multi-camera Pedestrian Videos dataset](https://www.epfl.ch/labs/cvlab/data/data-pom-index-php/), retain the attribution, and place local clips under the ignored `data/` directory before configuring `multi_config.json`.
 
-The same run emits `reid_candidates.json`: an explainable HSV appearance-matching baseline that ranks possible cross-camera matches. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification. A trained aerial-ground Re-ID model is the next research upgrade after this baseline is evaluated.
+The same run emits `reid_candidates.json`: it uses the trained AG-ReID ResNet-18 encoder when `runs/reid/agreid_resnet18_triplet.pt` is present, and otherwise falls back to an explainable HSV baseline. Its output is explicitly review-only; no local IDs are automatically merged and it is not biometric identity verification.
 
-For a labeled aerial-ground dataset, evaluate exported query/gallery embeddings with standard Rank-1, Rank-5, Rank-10, and mAP metrics:
+For a labelled AG-ReID aerial-ground experiment, create the official-split manifest, train, and evaluate with standard Rank-1, Rank-5, Rank-10, and mAP metrics:
 
 ```bat
 set PYTHONPATH=src
-python -m crowd_tracker.reid_eval_cli --manifest reid_eval.example.json
+python -m crowd_tracker.agreid_prepare_cli --dataset-root data\raw\AG-ReID --output data\processed\agreid_aerial_ground_manifest.jsonl
+python -m crowd_tracker.reid_train_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --output runs\reid\agreid_resnet18_triplet.pt --backbone resnet18 --embedding-dim 256 --epochs 12 --batch-size 16 --image-size 192 --device cuda
+python -m crowd_tracker.reid_benchmark_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --checkpoint runs\reid\agreid_resnet18_triplet.pt --output runs\reid\agreid_aerial_ground_metrics.json --device cuda
 ```
 
-The included manifest is only a schema example; real metrics require a dataset with known same-person labels across camera views.
+The local dataset, crops, checkpoints and metrics are all ignored by Git. Retain the AG-ReID licence and attribution when presenting this experiment.
 
 ## Dashboard preview frames
 

@@ -8,6 +8,7 @@ it is not a replacement for a trained aerial-ground person Re-ID model.
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from typing import Callable
 
 import numpy as np
 
@@ -39,9 +40,15 @@ class TrackDescriptor:
 class AppearanceGallery:
     """Maintains a small set of the best crops for each local track."""
 
-    def __init__(self, min_box_size: int = 32, max_samples_per_track: int = 6) -> None:
+    def __init__(
+        self,
+        min_box_size: int = 32,
+        max_samples_per_track: int = 6,
+        embedding_fn: Callable[[np.ndarray], np.ndarray] | None = None,
+    ) -> None:
         self._min_box_size = min_box_size
         self._max_samples = max_samples_per_track
+        self._embedding_fn = embedding_fn or self._embedding
         self._entries: dict[tuple[str, int], _GalleryEntry] = {}
 
     def add(self, frame: np.ndarray, observation: TrackObservation) -> None:
@@ -63,7 +70,10 @@ class AppearanceGallery:
             self._entries[key] = entry
         entry.first_timestamp = min(entry.first_timestamp, observation.timestamp_seconds)
         entry.last_timestamp = max(entry.last_timestamp, observation.timestamp_seconds)
-        entry.samples.append((quality, self._embedding(crop)))
+        embedding = self._embedding_fn(crop)
+        if embedding.ndim != 1 or not np.isfinite(embedding).all():
+            return
+        entry.samples.append((quality, embedding.astype(np.float32, copy=False)))
         entry.samples.sort(key=lambda sample: sample[0], reverse=True)
         del entry.samples[self._max_samples :]
         if quality > entry.best_quality:

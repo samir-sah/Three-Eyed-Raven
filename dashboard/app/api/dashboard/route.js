@@ -6,6 +6,7 @@ export const runtime = "nodejs";
 
 const ARTIFACTS_ROOT = path.resolve(process.cwd(), "..", "artifacts");
 const TRAINING_ROOT = path.resolve(process.cwd(), "..", "runs", "detect");
+const REID_ROOT = path.resolve(process.cwd(), "..", "runs", "reid");
 
 function safeJson(filePath, fallback) {
   try {
@@ -167,6 +168,17 @@ function readLatestMotBenchmark() {
     model: summary.model ?? "Unknown detector",
     ...aggregate,
   };
+}
+
+function readLatestReidBenchmark() {
+  const metrics = findFiles(REID_ROOT, "agreid_aerial_ground_metrics.json")
+    .map((file) => ({ file, modifiedAt: statSync(file).mtime }))
+    .sort((first, second) => second.modifiedAt - first.modifiedAt);
+  const latest = metrics[0];
+  if (!latest) return null;
+  const result = safeJson(latest.file, null);
+  if (!result || typeof result.rank_1 !== "number") return null;
+  return { ...result, updatedAt: latest.modifiedAt.toISOString() };
 }
 
 function readRun(runId) {
@@ -351,7 +363,7 @@ function readMultiRun(runId) {
 
 export async function GET() {
   if (!existsSync(ARTIFACTS_ROOT)) {
-    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress(), benchmark: null });
+    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress(), benchmark: null, reidBenchmark: readLatestReidBenchmark() });
   }
 
   const runs = readdirSync(ARTIFACTS_ROOT, { withFileTypes: true })
@@ -363,5 +375,5 @@ export async function GET() {
     .filter(Boolean)
     .sort((first, second) => new Date(second.updatedAt) - new Date(first.updatedAt));
 
-  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress(), benchmark: readLatestMotBenchmark() });
+  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress(), benchmark: readLatestMotBenchmark(), reidBenchmark: readLatestReidBenchmark() });
 }

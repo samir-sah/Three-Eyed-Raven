@@ -3,6 +3,7 @@ import unittest
 from pathlib import Path
 
 from crowd_tracker.reid_training import TripletManifestDataset, load_manifest
+from crowd_tracker.agreid_prepare_cli import build_manifest
 
 
 class ReIdTrainingTests(unittest.TestCase):
@@ -26,3 +27,19 @@ class ReIdTrainingTests(unittest.TestCase):
             )
             with self.assertRaisesRegex(ValueError, "Triplet"):
                 TripletManifestDataset(load_manifest(manifest))
+
+    def test_agreid_manifest_keeps_train_and_held_out_protocol_separate(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for folder, filenames in {
+                "bounding_box_train": ["P0001T00001A0C0F1.jpg", "P0001T00001A0C3F1.jpg"],
+                "query_all_c0": ["P0100T00001A0C0F1.jpg"],
+                "bounding_box_test_all_c3": ["P0100T00001A0C3F1.jpg"],
+            }.items():
+                directory = root / folder
+                directory.mkdir()
+                for name in filenames:
+                    (directory / name).touch()
+            records, metadata = build_manifest(root)
+            self.assertEqual(metadata["training_images"], 2)
+            self.assertEqual({record["split"] for record in records}, {"train", "test_query_aerial", "test_gallery_ground"})

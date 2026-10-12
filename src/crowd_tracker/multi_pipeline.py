@@ -48,9 +48,11 @@ class MultiStreamPipeline:
         self.config = config
         self.output_dir = Path(config.output_dir)
         self.output_dir.mkdir(parents=True, exist_ok=True)
+        self.reid_encoder = self._load_reid_encoder()
         self.gallery = AppearanceGallery(
             min_box_size=config.reid_min_box_size,
             max_samples_per_track=6,
+            embedding_fn=self.reid_encoder.embed_bgr if self.reid_encoder else None,
         )
         self.matcher = CrossCameraMatcher(
             candidate_threshold=config.reid_candidate_threshold,
@@ -80,7 +82,7 @@ class MultiStreamPipeline:
             thumbnail_paths = self.gallery.write_thumbnails(str(self.output_dir / "reid_crops"))
             candidates = self.matcher.rank(self.gallery.descriptors(thumbnail_paths))
         reid_summary = {
-            "method": "HSV appearance baseline",
+            "method": self.reid_encoder.method_label if self.reid_encoder else "HSV appearance baseline",
             "candidate_threshold": self.config.reid_candidate_threshold,
             "review_candidates": sum(candidate["status"] == "review" for candidate in candidates),
             "ranked_pairs": len(candidates),
@@ -105,6 +107,19 @@ class MultiStreamPipeline:
         (self.output_dir / "manifest.json").write_text(json.dumps({"cameras": cameras}, indent=2), encoding="utf-8")
         RunStore.for_output_dir(self.output_dir).upsert(self.output_dir.name, self.output_dir, summary)
         return summary
+
+    def _load_reid_encoder(self):
+        if not self.config.reid_checkpoint:
+            return None
+        # Keep the lightweight HSV-only path free of the optional torchvision
+        # inference dependency. It is imported only for a trained checkpoint.
+        from .reid_inference import TrainedReIdEncoder
+
+        return TrainedReIdEncoder(
+            self.config.reid_checkpoint,
+            device=self.config.device,
+            image_size=self.config.reid_image_size,
+        )
 
     def _open_camera(self, camera: CameraStreamConfig) -> _CameraState:
         capture = cv2.VideoCapture(camera.source)

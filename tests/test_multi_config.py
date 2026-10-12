@@ -47,3 +47,12 @@ class MultiStreamConfigTests(unittest.TestCase):
         )
         with self.assertRaisesRegex(ValueError, "model"):
             config.validate()
+
+    def test_rejects_blank_reid_checkpoint(self):
+        config = MultiStreamConfig(
+            output_dir="artifacts/two_stream_demo",
+            cameras=[CameraStreamConfig(id="a", source="a.mp4"), CameraStreamConfig(id="b", source="b.mp4")],
+            reid_checkpoint="",
+        )
+        with self.assertRaisesRegex(ValueError, "reid_checkpoint"):
+            config.validate()

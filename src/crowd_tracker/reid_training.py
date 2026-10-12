@@ -54,8 +54,10 @@ class TripletManifestDataset(Dataset):
         self.root = Path(root)
         self.random = random.Random(seed)
         self.by_id: dict[str, list[ReIdSample]] = {}
+        self.by_id_camera: dict[str, dict[str, list[ReIdSample]]] = {}
         for sample in samples:
             self.by_id.setdefault(sample.person_id, []).append(sample)
+            self.by_id_camera.setdefault(sample.person_id, {}).setdefault(sample.camera_id, []).append(sample)
         self.eligible = [sample for sample in samples if len(self.by_id[sample.person_id]) >= 2 and len(self.by_id) >= 2]
         if not self.eligible:
             raise ValueError("Triplet training needs at least two identities and two samples for at least one identity.")
@@ -70,7 +72,15 @@ class TripletManifestDataset(Dataset):
 
     def __getitem__(self, index: int):
         anchor = self.eligible[index]
-        positive_options = [sample for sample in self.by_id[anchor.person_id] if sample.path != anchor.path]
+        # Cross-camera positives make the metric space useful for aerial-to-ground
+        # retrieval. If an identity has only one camera, retain a same-camera
+        # positive instead of silently dropping valid labelled examples.
+        positive_options = [
+            sample for sample in self.by_id[anchor.person_id]
+            if sample.path != anchor.path and sample.camera_id != anchor.camera_id
+        ]
+        if not positive_options:
+            positive_options = [sample for sample in self.by_id[anchor.person_id] if sample.path != anchor.path]
         positive = self.random.choice(positive_options)
         negative_id = self.random.choice([identity for identity in self.by_id if identity != anchor.person_id])
         negative = self.random.choice(self.by_id[negative_id])

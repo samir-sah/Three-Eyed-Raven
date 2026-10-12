@@ -58,13 +58,15 @@ set PYTHONPATH=src
 python -m crowd_tracker.train_detector_cli --data configs\visdrone_person.example.yaml --resume runs\detect\runs\detect\visdrone_person_50e\weights\last.pt --workers 1
 ```
 
-## Re-ID training preparation
+## AG-ReID aerial-to-ground training
 
-Create a JSONL manifest with `path`, `person_id`, `camera_id`, and `split`; use `configs/reid_train.example.jsonl` as the schema. Each train identity needs at least two images, ideally from different camera viewpoints. Then train a shared ResNet encoder using triplet loss:
+AG-ReID v1 is installed locally under `data/raw/AG-ReID` (gitignored). Its labelled C0/C1/C2 UAV images and C3 CCTV images are used for cross-view triplets. The manifest tool preserves the official held-out protocol: C0 aerial queries are evaluated against the C3 ground-camera gallery.
 
 ```bat
 set PYTHONPATH=src
-python -m crowd_tracker.reid_train_cli --manifest configs\reid_train.jsonl --root data\processed\ag_reid --output models\reid_encoder.pt --backbone resnet50 --device cuda
+python -m crowd_tracker.agreid_prepare_cli --dataset-root data\raw\AG-ReID --output data\processed\agreid_aerial_ground_manifest.jsonl
+python -m crowd_tracker.reid_train_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --output runs\reid\agreid_resnet18_triplet.pt --backbone resnet18 --embedding-dim 256 --epochs 12 --batch-size 16 --image-size 192 --device cuda
+python -m crowd_tracker.reid_benchmark_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --checkpoint runs\reid\agreid_resnet18_triplet.pt --output runs\reid\agreid_aerial_ground_metrics.json --device cuda
 ```
 
-The training checkpoint can then be used to export query and gallery embeddings for `crowd_tracker.reid_eval_cli`. Do not run or present this as an experiment until the dataset licence/terms allow local training and the manifest has disjoint train/test identities.
+The dashboard automatically selects `runs/reid/agreid_resnet18_triplet.pt` for new two-camera uploads once it exists. The dashboard reports the held-out Rank-1/5/10 and mAP values and labels each visual link as a manual-review candidate. It never merges camera-local IDs or verifies an identity automatically.

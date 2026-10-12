@@ -7,6 +7,7 @@ import { spawn } from "node:child_process";
 const PROJECT_ROOT = path.resolve(process.cwd(), "..");
 const UPLOAD_ROOT = path.join(PROJECT_ROOT, "data", "uploads");
 const ARTIFACTS_ROOT = path.join(PROJECT_ROOT, "artifacts");
+const DEFAULT_REID_CHECKPOINT = path.join(PROJECT_ROOT, "runs", "reid", "agreid_resnet18_triplet.pt");
 const SAFE_RUN_ID = /^[A-Za-z0-9_-]+$/;
 const SUPPORTED_EXTENSIONS = new Set([".mp4", ".avi", ".mov", ".mkv", ".mpg", ".mpeg", ".webm"]);
 const MAX_FILE_BYTES = 1_500_000_000;
@@ -94,7 +95,11 @@ export async function startUploadRun(formData) {
   const config = {
     output_dir: path.join("artifacts", runId), model: "yolo11n.pt", device: "auto", confidence_threshold: 0.35, iou_threshold: 0.5,
     frame_stride: 1, max_frames_per_camera: maxFrames, save_video: true, tracker: "bytetrack.yaml", reid_candidate_threshold: 0.72,
-    reid_top_k: 3, reid_min_box_size: 32, reconnect_attempts: 0, reconnect_delay_seconds: 0,
+    reid_top_k: 3, reid_min_box_size: 32,
+    // Prefer the evaluated AG-ReID encoder when it is available. The HSV
+    // baseline remains an explicit safe fallback while training is unfinished.
+    reid_checkpoint: existsSync(DEFAULT_REID_CHECKPOINT) ? DEFAULT_REID_CHECKPOINT : null,
+    reid_image_size: 192, reconnect_attempts: 0, reconnect_delay_seconds: 0,
     cameras: [{ id: "aerial", source: aerialPath, zones: [] }, { id: "ground", source: groundPath, zones: [] }],
   };
   await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
