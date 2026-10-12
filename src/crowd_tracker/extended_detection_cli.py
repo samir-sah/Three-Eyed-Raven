@@ -146,7 +146,7 @@ def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, s
         torch.cuda.empty_cache()
 
 
-def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, directory: Path, state: Status) -> dict:
+def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, directory: Path, state: Status, *, augment: bool = False) -> dict:
     import torch
     from ultralytics import YOLO
 
@@ -154,7 +154,7 @@ def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, 
     model = YOLO(str(checkpoint))
     try:
         metrics = model.val(data=str(data), split="val", imgsz=size, batch=1, device=0,
-                            workers=2, plots=False, save_json=False, conf=0.001, max_det=1000,
+                            workers=2, plots=False, save_json=False, conf=0.001, max_det=1000, augment=augment,
                             project=str(directory / "evaluation"), name=name, exist_ok=False)
         images = sorted((dataset / "val" / "images").glob("*.jpg"))
         rows = []
@@ -164,14 +164,14 @@ def evaluate(checkpoint: Path, name: str, size: int, data: Path, dataset: Path, 
         for start in range(len(images)):
             for result in model.predict(source=str(images[start]), stream=True,
                     imgsz=size, batch=1, device=0, conf=0.05, iou=0.7, max_det=1000,
-                    classes=[0], verbose=False, save=False):
+                    classes=[0], verbose=False, save=False, augment=augment):
                 image = Path(result.path)
                 labels = (dataset / "val" / "labels" / f"{image.stem}.txt").read_text().splitlines()
                 rows.append({"image": image.name, "actual": sum(bool(line.strip()) for line in labels),
                              "scores": result.boxes.conf.cpu().tolist()})
             state.update(evaluationImagesDone=len(rows), evaluationImagesTotal=len(images))
         elapsed = time.perf_counter() - started
-        report = {"name": name, "checkpoint": str(checkpoint), "imgsz": size,
+        report = {"name": name, "checkpoint": str(checkpoint), "imgsz": size, "test_time_augmentation": augment,
                   "detection": clean_metrics(metrics.results_dict), "counts": evaluate_counts(rows),
                   "validation_inference_seconds": elapsed, "images_per_second": len(images) / elapsed}
         atomic_json(directory / f"{name}_evaluation.json", report)
