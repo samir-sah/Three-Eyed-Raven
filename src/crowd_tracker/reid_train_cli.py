@@ -11,7 +11,7 @@ from torch import nn
 from torch.optim import AdamW
 from torch.utils.data import DataLoader
 
-from .reid_training import SiameseReIdEncoder, TripletManifestDataset, load_manifest
+from .reid_training import SiameseReIdEncoder, TripletManifestDataset, balanced_cross_camera_subset, load_manifest
 
 
 def main() -> None:
@@ -26,13 +26,18 @@ def main() -> None:
     parser.add_argument("--learning-rate", type=float, default=0.0001)
     parser.add_argument("--margin", type=float, default=0.3)
     parser.add_argument("--image-size", type=int, default=256)
+    parser.add_argument("--max-training-samples", type=int, default=None, help="Balanced cap for a laptop-scale experiment.")
+    parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default="cuda" if torch.cuda.is_available() else "cpu")
     parser.add_argument("--no-pretrained", action="store_true", help="Avoid downloading ImageNet backbone weights.")
     args = parser.parse_args()
     if args.epochs < 1 or args.batch_size < 2 or args.embedding_dim < 8:
         raise ValueError("epochs >= 1, batch-size >= 2, and embedding-dim >= 8 are required.")
 
-    dataset = TripletManifestDataset(load_manifest(args.manifest, split="train"), root=args.root, image_size=args.image_size)
+    train_samples = balanced_cross_camera_subset(
+        load_manifest(args.manifest, split="train"), args.max_training_samples, args.seed,
+    )
+    dataset = TripletManifestDataset(train_samples, root=args.root, image_size=args.image_size, seed=args.seed)
     loader = DataLoader(dataset, batch_size=args.batch_size, shuffle=True, num_workers=0, pin_memory=args.device.startswith("cuda"))
     device = torch.device(args.device)
     model = SiameseReIdEncoder(args.backbone, args.embedding_dim, pretrained=not args.no_pretrained).to(device)
@@ -54,8 +59,14 @@ def main() -> None:
         print(json.dumps({"epoch": epoch, "triplet_loss": round(mean_loss, 6)}))
     destination = Path(args.output)
     destination.parent.mkdir(parents=True, exist_ok=True)
-    torch.save({"state_dict": model.state_dict(), "backbone": args.backbone, "embedding_dim": args.embedding_dim, "losses": losses}, destination)
-    print(json.dumps({"checkpoint": str(destination), "final_triplet_loss": losses[-1], "device": str(device)}, indent=2))
+    torch.save({
+        "state_dict": model.state_dict(), "backbone": args.backbone, "embedding_dim": args.embedding_dim,
+        "image_size": args.image_size, "losses": losses, "training_samples": len(train_samples),
+    }, destination)
+    print(json.dumps({
+        "checkpoint": str(destination), "final_triplet_loss": losses[-1], "device": str(device),
+        "training_samples": len(train_samples),
+    }, indent=2))
 
 
 if __name__ == "__main__":

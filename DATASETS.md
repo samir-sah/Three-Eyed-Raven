@@ -65,7 +65,7 @@ AG-ReID v1 is installed locally under `data/raw/AG-ReID` (gitignored). Its label
 ```bat
 set PYTHONPATH=src
 python -m crowd_tracker.agreid_prepare_cli --dataset-root data\raw\AG-ReID --output data\processed\agreid_aerial_ground_manifest.jsonl
-python -m crowd_tracker.reid_train_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --output runs\reid\agreid_resnet18_triplet.pt --backbone resnet18 --embedding-dim 256 --epochs 12 --batch-size 16 --image-size 192 --device cuda
+python -m crowd_tracker.reid_train_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --output runs\reid\agreid_resnet18_triplet.pt --backbone resnet18 --embedding-dim 256 --epochs 3 --batch-size 16 --image-size 192 --max-training-samples 1200 --device cuda
 python -m crowd_tracker.reid_benchmark_cli --manifest data\processed\agreid_aerial_ground_manifest.jsonl --root data\raw\AG-ReID --checkpoint runs\reid\agreid_resnet18_triplet.pt --output runs\reid\agreid_aerial_ground_metrics.json --device cuda
 ```
 

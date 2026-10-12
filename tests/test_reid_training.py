@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from crowd_tracker.reid_training import TripletManifestDataset, load_manifest
+from crowd_tracker.reid_training import TripletManifestDataset, balanced_cross_camera_subset, load_manifest
 from crowd_tracker.agreid_prepare_cli import build_manifest
 
 
@@ -43,3 +43,20 @@ class ReIdTrainingTests(unittest.TestCase):
             records, metadata = build_manifest(root)
             self.assertEqual(metadata["training_images"], 2)
             self.assertEqual({record["split"] for record in records}, {"train", "test_query_aerial", "test_gallery_ground"})
+
+    def test_balanced_subset_preserves_two_cameras_per_identity(self):
+        samples = [
+            *[load_manifest_sample("1", "c0", index) for index in range(4)],
+            *[load_manifest_sample("1", "c3", index) for index in range(4)],
+            *[load_manifest_sample("2", "c0", index) for index in range(4)],
+            *[load_manifest_sample("2", "c3", index) for index in range(4)],
+        ]
+        subset = balanced_cross_camera_subset(samples, 6)
+        self.assertEqual(len(subset), 6)
+        self.assertEqual({sample.camera_id for sample in subset if sample.person_id == "1"}, {"c0", "c3"})
+        self.assertEqual({sample.camera_id for sample in subset if sample.person_id == "2"}, {"c0", "c3"})
+
+
+def load_manifest_sample(person_id, camera_id, index):
+    from crowd_tracker.reid_training import ReIdSample
+    return ReIdSample(f"{person_id}_{camera_id}_{index}.jpg", person_id, camera_id, "train")
