@@ -413,7 +413,7 @@ export default function DashboardClient() {
         <header className="topbar">
           <button className="icon-button mobile-menu" aria-label="Open menu"><Menu size={20} /></button>
           <div className="project-switch"><span className={service.available ? "status-dot status-dot-online" : "status-dot"} /> Crowd Intelligence <ChevronDown size={16} /></div>
-          <div className="top-actions"><span className="demo-mode">Panel demo</span><button className="icon-button"><Bell size={19} /><i /></button><button className="icon-button"><ShieldCheck size={19} /></button></div>
+          <div className="top-actions"><a className="demo-mode" href="/training">Training progress</a><button className="icon-button"><Bell size={19} /><i /></button><button className="icon-button"><ShieldCheck size={19} /></button></div>
         </header>
 
           <div className="content">
