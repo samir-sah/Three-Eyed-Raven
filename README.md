@@ -170,6 +170,8 @@ python -m crowd_tracker.reid_benchmark_cli --manifest data\processed\agreid_aeri
 
 The local dataset, crops, checkpoints and metrics are all ignored by Git. Retain the AG-ReID licence and attribution when presenting this experiment.
 
+To verify that trained embeddings flow through the same review-only pipeline, copy `configs/agreid_verification.example.json`, keep the local EPFL sources configured, and run `python -m crowd_tracker.multi_cli --config configs\agreid_verification.json`. This produces a short two-camera artifact using the checkpoint without changing either camera's local tracking IDs.
+
 ## Dashboard preview frames
 
 The annotated MP4 is created with OpenCV's FMP4 codec, which some browsers cannot play. Generate a browser-safe frame sequence for the Next.js dashboard with:

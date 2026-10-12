@@ -1,0 +1,30 @@
+{
+  "output_dir": "artifacts/agreid_encoder_verification",
+  "model": "yolo11n.pt",
+  "device": "auto",
+  "confidence_threshold": 0.35,
+  "iou_threshold": 0.5,
+  "frame_stride": 1,
+  "max_frames_per_camera": 120,
+  "save_video": true,
+  "tracker": "bytetrack.yaml",
+  "reid_candidate_threshold": 0.72,
+  "reid_top_k": 3,
+  "reid_min_box_size": 32,
+  "reid_checkpoint": "runs/reid/agreid_resnet18_triplet.pt",
+  "reid_image_size": 192,
+  "reconnect_attempts": 0,
+  "reconnect_delay_seconds": 0,
+  "cameras": [
+    {
+      "id": "lab_cam_0",
+      "source": "data/epfl_lab_4p_cam0_overlap.mp4",
+      "zones": []
+    },
+    {
+      "id": "lab_cam_1",
+      "source": "data/epfl_lab_4p_cam1_overlap.mp4",
+      "zones": []
+    }
+  ]
+}
