@@ -1,5 +1,7 @@
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
+import { readGroundBenchmark } from "../../../lib/ground-benchmark";
+import { readTrainingExperiment } from "../../../lib/training-status";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -106,6 +108,23 @@ function findFiles(directory, name, found = []) {
 }
 
 function readTrainingProgress() {
+  try {
+    const experiment = readTrainingExperiment();
+    if (experiment) {
+      const metrics = experiment.metrics ?? {};
+      const finished = experiment.status === "completed";
+      return {
+        name: `${experiment.architecture ?? "Detector"} · ${experiment.name}`,
+        updatedAt: experiment.updatedAt, currentEpoch: experiment.epoch ?? 0,
+        totalEpochs: experiment.totalEpochs ?? 0,
+        progress: finished ? 100 : Math.round((experiment.epoch ?? 0) / Math.max(1, experiment.totalEpochs ?? 1) * 100),
+        status: finished ? "completed" : experiment.status === "training" ? "running" : experiment.status,
+        lastLine: finished ? `Experiment completed. Validation comparison recommends ${experiment.comparison?.recommended_by_validation_map ?? "reviewing the saved report"}. Candidate checkpoints were not automatically deployed.` : "See Training progress for the current experiment stage.",
+        metrics: { precision: metrics["metrics/precision(B)"], recall: metrics["metrics/recall(B)"],
+          map50: metrics["metrics/mAP50(B)"], map5095: metrics["metrics/mAP50-95(B)"] },
+      };
+    }
+  } catch { /* Fall back to historical training logs if the live status is unavailable. */ }
   const logs = findFiles(TRAINING_ROOT, "training.log")
     .map((file) => ({ file, modifiedAt: statSync(file).mtime }))
     .sort((first, second) => second.modifiedAt - first.modifiedAt);
@@ -363,7 +382,7 @@ function readMultiRun(runId) {
 
 export async function GET() {
   if (!existsSync(ARTIFACTS_ROOT)) {
-    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress(), benchmark: null, reidBenchmark: readLatestReidBenchmark() });
+    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress(), benchmark: null, groundBenchmark: readGroundBenchmark(), reidBenchmark: readLatestReidBenchmark() });
   }
 
   const runs = readdirSync(ARTIFACTS_ROOT, { withFileTypes: true })
@@ -375,5 +394,5 @@ export async function GET() {
     .filter(Boolean)
     .sort((first, second) => new Date(second.updatedAt) - new Date(first.updatedAt));
 
-  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress(), benchmark: readLatestMotBenchmark(), reidBenchmark: readLatestReidBenchmark() });
+  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress(), benchmark: readLatestMotBenchmark(), groundBenchmark: readGroundBenchmark(), reidBenchmark: readLatestReidBenchmark() });
 }

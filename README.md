@@ -11,6 +11,8 @@ This runnable project processes recorded aerial and CCTV video with YOLO person 
 - Cross-camera appearance ranking is review-only; it never merges IDs or asserts a real-world identity.
 - A Next.js dashboard reads the local artifacts and presents playback, metrics, alerts, and review evidence.
 
+For the fresh anonymous ground-detector comparison, see [the evaluation protocol](docs/DETECTION_EVALUATION_PROTOCOL.md) and [the measured 13 October baseline](docs/GROUND_DETECTION_BASELINE_20261013.md). The dashboard's **Model comparisons** view distinguishes this audit from the historical MOT17 tracking report.
+
 ## Setup
 
 Use Python 3.10 or later. An NVIDIA CUDA-enabled PyTorch installation is recommended for real-time speed.

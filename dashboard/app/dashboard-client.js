@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import GroundBenchmark from "./ground-benchmark";
 import {
   Activity,
   Bell,
@@ -31,6 +32,7 @@ const navItems = [
   ["tracking", Activity, "Tracking"],
   ["alerts", ShieldCheck, "Alerts"],
   ["development", FolderKanban, "Development"],
+  ["benchmarks", Gauge, "Model comparisons"],
 ];
 
 function number(value, digits = 0) {
@@ -224,7 +226,7 @@ function FullMotBenchmark({ benchmark }) {
     ["Precision", benchmark.precision], ["Recall", benchmark.recall], ["F1", benchmark.f1],
     ["MOTA", benchmark.mota], ["MOTP", benchmark.motp], ["IDF1", benchmark.idf1], ["HOTA", benchmark.hota], ["ID switches", benchmark.id_switches],
   ];
-  return <section className="card evaluation-card full-benchmark-card"><div className="card-heading"><div><span className="eyebrow">MOT17 CROSS-DOMAIN EVALUATION</span><h2>Strong precision, limited ground-camera recall</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} ground-truth boxes · {relativeTime(benchmark.updatedAt)}</p></div><span className="subtle-pill">Measured baseline</span></div><p className="benchmark-conclusion">This is a stress test: the VisDrone aerial-trained detector and ByteTrack were evaluated on MOT17 ground-surveillance footage. It is usually right when it detects someone ({number(benchmark.precision * 100, 1)}% precision), but it misses many people ({number(benchmark.recall * 100, 1)}% recall). This is a domain gap, not production-ready CCTV performance.</p><details className="metric-details"><summary>Explain and show all MOT17 metrics</summary><p>MOTA combines missed detections, false positives and ID changes; MOTP measures box alignment; IDF1 measures track identity continuity; HOTA balances detection and association. Higher is better except for ID switches.</p><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></details></section>;
+  return <details className="card evaluation-card full-benchmark-card"><summary>Historical MOT17 tracking benchmark · {new Date(benchmark.updatedAt).toLocaleDateString("en-IN")}</summary><div className="card-heading"><div><span className="eyebrow">HISTORICAL CROSS-DOMAIN BENCHMARK</span><h2>Older aerial detector tested with ByteTrack</h2><p>{benchmark.label} · {number(benchmark.ground_truth_boxes)} annotated person appearances across frames</p></div><span className="subtle-pill">Historical experiment</span></div><p className="benchmark-conclusion">This saved run used an aerial-trained checkpoint plus tracking. Its {number(benchmark.recall * 100, 1)}% recall does not measure today’s upload detector. Training-domain differences and pipeline filtering are possible contributors; this report does not isolate the cause.</p><p className="benchmark-checkpoint">Checkpoint: {benchmark.model}</p><details className="metric-details"><summary>Explain and show historical metrics</summary><p>MOTA combines missed detections, false positives and ID changes; MOTP measures matched-box alignment; IDF1 measures track identity continuity; HOTA balances detection and association. HOTA is the project’s internal calculation pending official TrackEval verification. Higher is better except for ID switches.</p><div className="evaluation-grid">{metrics.map(([label, value]) => <div key={label}><span>{label}</span><strong>{typeof value === "number" && label !== "ID switches" ? `${number(value * 100, 2)}%` : number(value)}</strong></div>)}</div></details></details>;
 }
 
 function ReIdBenchmark({ benchmark }) {
@@ -264,6 +266,7 @@ function SupportingWorkspace({ run, data, metrics, refreshedAt, activePanel, onP
     ["tracking", "Camera activity"],
     ["performance", "Performance"],
     ["development", "Development"],
+    ["benchmarks", "Model comparisons"],
   ];
   return <section id="supporting-workspace" className="card supporting-workspace">
     <div className="card-heading"><div><span className="eyebrow">SUPPORTING DETAILS</span><h2>Explore the run without leaving playback</h2><p>Switch views to inspect evidence, activity, performance, or project progress.</p></div></div>
@@ -272,6 +275,7 @@ function SupportingWorkspace({ run, data, metrics, refreshedAt, activePanel, onP
       {activePanel === "review" && (run.isMulti ? <ReIdCandidates reid={run.reid} /> : <TrackAndAlerts run={run} metrics={metrics} />)}
       {activePanel === "tracking" && <TrackAndAlerts run={run} metrics={metrics} />}
       {activePanel === "performance" && <PerformanceWorkspace run={run} metrics={metrics} />}
+      {activePanel === "benchmarks" && <div className="benchmark-workspace"><GroundBenchmark benchmark={data.groundBenchmark} /><FullMotBenchmark benchmark={data.benchmark} /></div>}
       {activePanel === "development" && <div className="development-workspace"><section className="compact-inset development-card"><span className="eyebrow">DEVELOPMENT ROADMAP</span><h2>Where the project stands</h2><div className="milestones"><span className="complete"><CheckCircle2 size={16} /> Detection</span><span className="complete"><CheckCircle2 size={16} /> Local tracking</span><span className="complete"><CheckCircle2 size={16} /> Crowd analytics</span><span className="complete"><CheckCircle2 size={16} /> Re-ID review</span><span className="current"><Radio size={16} /> Field validation</span></div></section><section className="compact-inset run-details"><span className="eyebrow">RUN DETAILS</span><dl><div><dt>Input</dt><dd>{metrics.source}</dd></div><div><dt>Last refresh</dt><dd>{refreshedAt ? refreshedAt.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }) : "—"}</dd></div></dl></section><ReIdBenchmark benchmark={data.reidBenchmark} /><TrainingProgress training={data.training} /><FullMotBenchmark benchmark={data.benchmark} /></div>}
     </div>
   </section>;
@@ -379,7 +383,7 @@ export default function DashboardClient() {
   const metrics = run?.metrics;
   const goToSection = (section) => {
     setActiveSection(section);
-    const workspaceForSection = { tracking: "tracking", alerts: "tracking", development: "development" }[section];
+    const workspaceForSection = { tracking: "tracking", alerts: "tracking", development: "development", benchmarks: "benchmarks" }[section];
     if (workspaceForSection) setActiveWorkspace(workspaceForSection);
     const target = workspaceForSection ? "supporting-workspace" : section;
     requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
