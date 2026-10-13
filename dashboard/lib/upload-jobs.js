@@ -7,6 +7,7 @@ import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readTrainingExperiment } from "./training-status.js";
 import { groundCameraConfig } from "./detection-policy.mjs";
+import { readDashboardWorkspace, isCurrentWorkspaceJob } from "./dashboard-workspace.mjs";
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..");
 const UPLOAD_ROOT = path.join(PROJECT_ROOT, "data", "uploads");
@@ -26,7 +27,7 @@ function pythonExecutable() {
 
 function jobPath(runId) { return path.join(UPLOAD_ROOT, runId, "job.json"); }
 
-export async function readUploadJob(runId) {
+async function readStoredUploadJob(runId) {
   if (!SAFE_RUN_ID.test(runId)) return null;
   try {
     const value = JSON.parse(await readFile(jobPath(runId), "utf8"));
@@ -46,8 +47,16 @@ export async function readUploadJob(runId) {
   } catch { return null; }
 }
 
+export async function readUploadJob(runId) {
+  let workspace;
+  try { workspace = readDashboardWorkspace(PROJECT_ROOT); }
+  catch { return null; }
+  const job = await readStoredUploadJob(runId);
+  return isCurrentWorkspaceJob(job, workspace) ? job : null;
+}
+
 async function writeJob(runId, update) {
-  const previous = await readUploadJob(runId);
+  const previous = await readStoredUploadJob(runId);
   const next = { ...previous, ...update, updatedAt: new Date().toISOString() };
   await writeFile(jobPath(runId), JSON.stringify(next, null, 2), "utf8");
   return next;
@@ -91,6 +100,8 @@ async function processUploadRun(runId, configPath) {
 }
 
 export async function startUploadRun(formData) {
+  // A missing marker is an error, not permission to rediscover old demo footage.
+  const workspace = readDashboardWorkspace(PROJECT_ROOT);
   let experiment;
   try { experiment = readTrainingExperiment(); } catch { /* No readable experiment status. */ }
   if (experiment?.pid && !["completed", "completed_with_errors", "failed"].includes(experiment.status)) {
@@ -129,6 +140,7 @@ export async function startUploadRun(formData) {
 
   const configPath = path.join(directory, "multi_config.json");
   const config = {
+    dashboard_workspace_id: workspace.workspace_id, upload_run_id: runId,
     output_dir: path.join("artifacts", runId), device: "auto", confidence_threshold: 0.35,
     max_frames_per_camera: maxFrames,
     cameras: [{ id: "aerial", label: aerialProfile === "aerial" ? "Aerial / drone view" : "Camera A · ground / elevated view", source: aerialPath,
@@ -137,11 +149,12 @@ export async function startUploadRun(formData) {
   };
   await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
   await writeFile(jobPath(runId), JSON.stringify({
+    workspaceId: workspace.workspace_id,
     runId, status: "queued", stage: "Videos received; preparing anonymous crowd analysis", createdAt: new Date().toISOString(), updatedAt: new Date().toISOString(),
     maxFrames, sourceNames: { aerial: aerial.name, ground: ground.name },
   }, null, 2), "utf8");
   void processUploadRun(runId, configPath).catch((error) => console.error("Could not persist upload job status:", error.message));
-  return { runId, status: "queued" };
+  return { runId, workspaceId: workspace.workspace_id, status: "queued" };
   } catch (error) {
     await lock.close().catch(() => undefined);
     await unlink(UPLOAD_LOCK).catch(() => undefined);

@@ -1,8 +1,9 @@
 import "./globals.css";
+import "./workspace.css";
 
 export const metadata = {
   title: "Three Eyed Raven | Crowd Intelligence",
-  description: "Real-time crowd tracking project dashboard",
+  description: "Analyse your uploaded aerial and ground videos with anonymous crowd detection",
 };
 
 export default function RootLayout({ children }) {

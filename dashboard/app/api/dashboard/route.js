@@ -3,11 +3,14 @@ import path from "node:path";
 import { readGroundBenchmark } from "../../../lib/ground-benchmark";
 import { readTrainingExperiment } from "../../../lib/training-status";
 import { countSummary, sampleCountTimeline, countLogComplete } from "../../../lib/count-summary.mjs";
+import { readDashboardWorkspace, isCurrentWorkspaceUpload } from "../../../lib/dashboard-workspace.mjs";
+import { readUploadJob } from "../../../lib/upload-jobs.js";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
-const ARTIFACTS_ROOT = path.resolve(process.cwd(), "..", "artifacts");
+const PROJECT_ROOT = path.resolve(process.cwd(), "..");
+const ARTIFACTS_ROOT = path.join(PROJECT_ROOT, "artifacts");
 const TRAINING_ROOT = path.resolve(process.cwd(), "..", "runs", "detect");
 const REID_ROOT = path.resolve(process.cwd(), "..", "runs", "reid");
 
@@ -281,7 +284,7 @@ function readRun(runId) {
   };
 }
 
-function readMultiRun(runId) {
+function readMultiRun(runId, job) {
   const runDirectory = path.join(ARTIFACTS_ROOT, runId);
   const summaryPath = path.join(runDirectory, "summary.json");
   const summary = safeJson(summaryPath, {});
@@ -317,6 +320,7 @@ function readMultiRun(runId) {
       : 0;
     return {
       id: camera.camera_id,
+      originalName: job?.sourceNames?.[camera.camera_id] ?? null,
       label: camera.label || cameraLabel(camera.camera_id),
       detector: detectorLabel(camera.model ?? fallbackModel, camera.runtime_detection_profile),
       previewFrames: preview.frames,
@@ -360,6 +364,9 @@ function readMultiRun(runId) {
   });
   return {
     id: runId,
+    workspaceId: job?.workspaceId ?? null,
+    createdAt: job?.createdAt ?? null,
+    sourceNames: job?.sourceNames ?? {},
     label: runId.startsWith("upload_") ? "Uploaded two-camera run" : "Two Stream Demo",
     isMulti: true,
     analysisType: summary.analysis_type ?? "legacy_tracking",
@@ -398,18 +405,20 @@ function readMultiRun(runId) {
 }
 
 export async function GET() {
-  if (!existsSync(ARTIFACTS_ROOT)) {
-    return Response.json({ runs: [], activeRun: null, training: readTrainingProgress(), benchmark: null, groundBenchmark: readGroundBenchmark(), reidBenchmark: readLatestReidBenchmark() });
+  const research = { training: readTrainingProgress(), benchmark: readLatestMotBenchmark(), groundBenchmark: readGroundBenchmark(), reidBenchmark: readLatestReidBenchmark() };
+  let workspace;
+  try { workspace = readDashboardWorkspace(PROJECT_ROOT); }
+  catch (error) {
+    return Response.json({ runs: [], activeRun: null, workspaceId: null, workspaceError: error.message, ...research }, { headers: { "Cache-Control": "no-store" } });
   }
-
-  const runs = readdirSync(ARTIFACTS_ROOT, { withFileTypes: true })
-    .filter((entry) => entry.isDirectory())
-    .map((entry) => {
-      const summary = safeJson(path.join(ARTIFACTS_ROOT, entry.name, "summary.json"), {});
-      return summary.run_type === "multi_stream" ? readMultiRun(entry.name) : readRun(entry.name);
-    })
+  const entries = existsSync(ARTIFACTS_ROOT) ? readdirSync(ARTIFACTS_ROOT, { withFileTypes: true }).filter((entry) => entry.isDirectory()) : [];
+  const accepted = await Promise.all(entries.map(async (entry) => {
+    const summary = safeJson(path.join(ARTIFACTS_ROOT, entry.name, "summary.json"), null);
+    const job = await readUploadJob(entry.name);
+    return isCurrentWorkspaceUpload(entry.name, summary, job, workspace, PROJECT_ROOT) ? readMultiRun(entry.name, job) : null;
+  }));
+  const runs = accepted
     .filter(Boolean)
     .sort((first, second) => new Date(second.updatedAt) - new Date(first.updatedAt));
-
-  return Response.json({ runs, activeRun: runs[0] ?? null, training: readTrainingProgress(), benchmark: readLatestMotBenchmark(), groundBenchmark: readGroundBenchmark(), reidBenchmark: readLatestReidBenchmark() });
+  return Response.json({ runs, activeRun: runs[0] ?? null, workspaceId: workspace.workspace_id, workspaceError: null, ...research }, { headers: { "Cache-Control": "no-store" } });
 }

@@ -40,3 +40,12 @@ export function chooseSelection(runs, current, stored) {
 export function selectedRun(runs, selection) {
   return runs.find((run) => run.id === selection?.runId && run.hasVideo && recordingKey(run) === selection.recordingKey) ?? null;
 }
+
+export function chooseWorkspaceSelection(runs, current, stored, workspaceId) {
+  if (typeof workspaceId !== "string" || !workspaceId) return null;
+  for (const selection of [current, stored]) {
+    if (selection?.workspaceId === workspaceId && selectedRun(runs, selection)) return selection;
+  }
+  const first = recordingsFromRuns(runs)[0];
+  return first ? { workspaceId, runId: first.run.id, recordingKey: first.key } : null;
+}

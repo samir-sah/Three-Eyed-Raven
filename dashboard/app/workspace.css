@@ -1,0 +1,76 @@
+/* Fresh-upload UI: no legacy demo player or repeated content across views. */
+.workspace-uploader[hidden], .workspace-player[hidden] { display: none !important; }
+.fresh-shell .sidebar { overflow-y: auto; gap: 0; }
+.fresh-shell .sidebar-brand-block { flex: 0 0 auto; padding: 2px 10px 27px; }
+.fresh-shell .brand { align-items: center; padding: 0; gap: 11px; min-height: 38px; line-height: 1.25; }
+.fresh-shell .brand-mark { flex: 0 0 34px; width: 34px; height: 34px; }
+.fresh-shell .brand > span:last-child { font-size: 17px; font-weight: 700; white-space: normal; }
+.fresh-shell .sidebar-intro { margin: 12px 0 0; padding: 0; font-size: 11px; line-height: 1.5; }
+.fresh-shell .side-label { margin-top: 0; }
+.fresh-shell .nav-item { min-height: 42px; line-height: 1.35; }
+.fresh-shell .nav-item svg { flex: 0 0 18px; }
+.fresh-shell .sidebar-foot { margin-top: auto; flex: 0 0 auto; padding: 16px; }
+.fresh-shell .sidebar-foot p { font-size: 11px; }
+.fresh-shell .advanced-nav { margin-bottom: 20px; }
+.fresh-shell .project-switch { display: flex; align-items: center; gap: 9px; min-width: 0; line-height: 1.25; }
+.fresh-shell .project-switch > span:last-child { font-size: 14px; }
+.fresh-shell .top-actions { margin-left: auto; }
+.fresh-shell .focused-content { padding-top: 25px; }
+.fresh-shell .selected-footage-bar strong { overflow-wrap: anywhere; }
+.fresh-shell .focused-result { padding: 24px; }
+.fresh-shell .focused-panel h2, .fresh-upload h2, .fresh-overview h2 { font-size: 20px; line-height: 1.3; }
+.fresh-shell .focused-panel > p, .fresh-upload .compact-heading p, .fresh-overview .compact-heading p { max-width: 850px; font-size: 12px; line-height: 1.6; }
+.fresh-upload { padding: 24px; }
+.fresh-upload-form { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin-top: 22px; }
+.fresh-upload .upload-slot { padding: 25px 19px; min-height: 135px; border-style: dashed; align-items: center; }
+.fresh-upload .upload-slot small { max-width: 100%; white-space: normal; overflow-wrap: anywhere; }
+.fresh-upload-footer { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid #eee; padding-top: 16px; }
+.fresh-upload-footer p { max-width: 580px; margin: 0; font-size: 11px; line-height: 1.5; color: #777; }
+.fresh-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 22px; }
+.fresh-note { margin: 17px 0 0; color: #777; font-size: 11px; line-height: 1.6; }
+.fresh-empty { display: grid; justify-items: center; gap: 12px; min-height: 290px; padding: 35px 22px; text-align: center; }
+.fresh-empty h2 { margin: 0; font-size: 21px; }.fresh-empty p { margin: 0; max-width: 520px; line-height: 1.6; font-size: 12px; color: #777; }
+.fresh-counts { grid-template-columns: repeat(2, minmax(0, 1fr)); margin-top: 20px; }
+.fresh-counts strong { font-size: 38px; }.fresh-counts > div { padding: 21px; }
+.analysis-camera-list { display: grid; gap: 10px; margin-top: 18px; }
+.analysis-camera-list > div { display: flex; align-items: center; gap: 12px; padding: 12px; border: 1px solid #eee; border-radius: 10px; }
+.analysis-camera-list > div > svg { flex-shrink: 0; }.analysis-camera-list span { min-width: 0; }
+.analysis-camera-list strong, .analysis-camera-list small { display: block; overflow-wrap: anywhere; }.analysis-camera-list strong { font-size: 12px; }.analysis-camera-list small { margin-top: 4px; font-size: 10px; color: #777; }
+.analysis-camera-list .subtle-pill { margin-left: auto; }
+.fresh-activity, .technical-camera-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; margin: 20px 0; }
+.fresh-activity > section, .technical-camera-list > section { min-width: 0; padding: 18px; border: 1px solid #e8e8e8; border-radius: 12px; background: #fafafa; }
+.fresh-activity h3, .technical-camera-list h3 { font-size: 14px; margin: 0 0 7px; }.fresh-activity p { font-size: 11px; color: #777; }
+.fresh-activity .occupancy-chart { height: 210px; }
+.technical-camera-list dl { margin: 13px 0 0; font-size: 11px; }.technical-camera-list dl > div { display: grid; grid-template-columns: 110px minmax(0, 1fr); gap: 12px; padding: 10px 0; border-bottom: 1px solid #eee; }.technical-camera-list dt { color: #777; }.technical-camera-list dd { margin: 0; overflow-wrap: anywhere; }
+.product-capabilities { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; margin: 22px 0; }.product-capabilities span { display: flex; gap: 9px; align-items: center; background: #f6f6f6; border-radius: 10px; padding: 14px; font-size: 12px; }.product-capabilities svg { flex-shrink: 0; }
+.focused-panel > .secondary-button { margin-top: 18px; }.focused-panel > .ground-benchmark { margin-top: 20px; }
+.fresh-run-picker { display: grid; gap: 4px; font-size: 10px; color: #777; }.fresh-run-picker select { padding: 7px; border: 1px solid #ddd; border-radius: 7px; background: #fff; color: #222; max-width: 300px; }
+.fresh-shell .focused-video-card { padding: 12px; }
+.independent-footage-player { background: transparent; }
+.independent-footage-streams { padding: 0; gap: 14px; background: transparent; }
+.independent-camera { overflow: hidden; border: 1px solid #e4e4e4; border-radius: 12px; background: #f6f6f6; }
+.independent-camera-header { padding: 12px; justify-content: space-between; }
+.independent-camera-title { display: flex; align-items: center; gap: 7px; min-width: 0; line-height: 1.4; }
+.independent-expand { flex-shrink: 0; padding: 6px 8px; font-size: 10px; }
+.independent-video { border-radius: 0; height: clamp(340px, 48vh, 620px); }
+.independent-controls { display: flex; align-items: center; gap: 8px; padding: 12px; color: #fff; background: #191919; font-size: 10px; }
+.independent-play { flex-shrink: 0; }.independent-seek { min-width: 35px; flex: 1; width: 0; accent-color: #fff; }.independent-time { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.independent-replay { display: inline-flex; align-items: center; gap: 4px; padding: 6px; border: 1px solid #555; border-radius: 6px; color: #fff; background: transparent; font-size: 10px; }
+.independent-replay:disabled, .independent-play:disabled { opacity: .35; cursor: default; }
+.independent-camera-meta { padding: 10px 12px; color: #777; font-size: 10px; }
+.independent-note { padding: 14px 2px 0; color: #777; line-height: 1.5; font-size: 11px; }
+.independent-error { margin: 12px; }.independent-error .secondary-button { margin-top: 8px; }
+.independent-camera:fullscreen { display: flex; flex-direction: column; background: #111; border: 0; border-radius: 0; }.independent-camera:fullscreen .independent-video { flex: 1; height: 0; min-height: 0; }.independent-camera:fullscreen .independent-camera-header, .independent-camera:fullscreen .independent-camera-meta { color: #fff; }
+@media (max-width: 1100px) { .fresh-shell .sidebar-brand-block { padding-inline: 2px; }.fresh-shell .brand > span:last-child { font-size: 14px; }.independent-replay span { display: none; } }
+@media (max-width: 760px) {
+  .fresh-shell .sidebar-brand-block { padding: 3px 8px 24px; }.fresh-shell .brand > span:last-child { font-size: 16px; }
+  .fresh-shell .topbar { padding-inline: 12px; }.fresh-shell .project-switch { margin-left: 3px; }.fresh-shell .top-actions .subtle-pill { display: none; }
+  .fresh-shell .focused-content { padding-top: 20px; }.fresh-shell .focused-result, .fresh-upload { padding: 18px; }
+  .fresh-upload .compact-heading, .fresh-overview .compact-heading { flex-direction: column; }
+  .fresh-upload-form, .fresh-activity, .technical-camera-list, .product-capabilities { grid-template-columns: 1fr; }
+  .fresh-upload-footer { flex-direction: column; align-items: stretch; }.fresh-upload-footer .primary-button { justify-content: center; }
+  .fresh-counts > div { padding: 15px; }.fresh-counts strong { font-size: 29px; }
+  .fresh-shell .selected-footage-bar { flex-wrap: wrap; }.fresh-run-picker select { max-width: 100%; }
+  .independent-footage-streams { grid-template-columns: 1fr; }.independent-video { height: clamp(260px, 43vh, 480px); }
+  .independent-replay span { display: inline; }.independent-camera-header { font-size: 11px; }
+}

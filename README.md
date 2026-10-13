@@ -4,6 +4,8 @@ This runnable project processes recorded aerial and CCTV video with YOLO person 
 
 ## Current scope
 
+The dashboard is now a **fresh upload workspace**. Historical demos and saved analyses are excluded from its recording list (files are preserved). Upload your own clips in **Upload videos**; only completed uploads received in the current workspace can appear. Overview shows the new clip counts, Playback has separate play/pause/seek/replay controls for each camera, and other sidebar screens show their own content. Videos start paused, stop at the end, and pause when leaving Playback. The default frame limit is blank (full video); a chosen limit is an explicit partial analysis.
+
 The dashboard's **new uploads** use an isolated anonymous counting pipeline. True aerial views keep the previous best VisDrone-trained YOLO11n at 960px. Ground views now use the approved COCO YOLO11x profile at 1536px with multi-scale augmentation and CUDA FP16. Choose the general-detector option when the aerial upload is actually ground-level or elevated CCTV; it uses the same approved ground profile. It exports full-frame H.264 video and logs every frame, including zero detections. This path does not produce IDs, appearance crops, or cross-camera matches; existing tracking runs remain unchanged.
 
 Ground development mAP50 reached **70.96%**, versus 64.53% for YOLO11s/960 on the same 78 report images. Recall improved from 53.68% to 65.91%; adjusted count MAE fell from 4.73 to 2.83. This accuracy-first profile runs at about **3.47 decode+predict FPS** on the RTX 3050 laptop: offline analysis, not live real-time processing. These repeatedly inspected MOT17 scenes are **development evidence, not independent test results or uploaded-video accuracy**. Aerial scores and identity-matching performance did not improve in this experiment. See [the measured 70% target report](docs/GROUND_70_TARGET_20261013.md).
@@ -11,7 +13,7 @@ Ground development mAP50 reached **70.96%**, versus 64.53% for YOLO11s/960 on th
 - Recorded video input only; live RTSP/CCTV and drone feeds come after this offline baseline is evaluated.
 - `person` detections only (COCO class 0).
 - Legacy runs have **local** track IDs, polygon-zone occupancy/alerts, and review-only cross-camera appearance ranking. These features are not part of new anonymous uploads; a track ID is not a verified identity.
-- A Next.js dashboard reads the local artifacts and presents playback, metrics, alerts, and review evidence.
+- A Next.js dashboard presents current-workspace anonymous uploads, playback, per-camera counts and separate research comparisons. Legacy outputs remain on disk, not in the fresh dashboard.
 
 For anonymous analysis from the terminal, copy `config.anonymous.example.json`, supply the two video paths and available checkpoints, and run `python -m crowd_tracker.anonymous_cli --config config.anonymous.json` with `PYTHONPATH=src`. Use `device: "cpu"` if required. The aerial checkpoint is a local training artifact and is not bundled in Git. Missing checkpoints fail explicitly instead of silently choosing another model. New anonymous runs have no crowd-alert limit configured; the UI displays **Off**, not a misleading zero-alert safety result.
 
