@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import GroundBenchmark from "./ground-benchmark";
+import { chooseSelection, recordingKey, recordingsFromRuns, selectedRun as findSelectedRun } from "../lib/recordings.mjs";
 import {
   Activity,
   Bell,
@@ -28,12 +29,72 @@ import {
 
 const navItems = [
   ["overview", LayoutDashboard, "Overview"],
-  ["video-runs", Video, "Video runs"],
-  ["tracking", Activity, "Tracking"],
+  ["video-runs", Video, "Playback"],
+  ["tracking", Activity, "Crowd activity"],
   ["alerts", ShieldCheck, "Alerts"],
-  ["development", FolderKanban, "Development"],
-  ["benchmarks", Gauge, "Model comparisons"],
+  ["development", FolderKanban, "Project progress"],
 ];
+
+const advancedNav = [["benchmarks", Gauge, "Model comparisons"], ["performance", Cpu, "Technical details"], ["review", Eye, "Appearance review"]];
+const modeLabel = (mode) => [...navItems, ...advancedNav].find(([id]) => id === mode)?.[2] ?? "Overview";
+const selectionStorageKey = "three-eyed-raven:selected-footage";
+
+function clipTime(seconds) {
+  const value = Math.max(0, Math.floor(seconds || 0));
+  return `${Math.floor(value / 60).toString().padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
+}
+
+function FootagePlayer({ run }) {
+  const streams = run.isMulti ? run.streams : [{ id: "video", label: "Selected video", previewFrames: run.previewFrames ?? [], previewFps: run.previewFps }];
+  const [time, setTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const duration = Math.max(0, ...streams.map((stream) => Math.max(0, stream.previewFrames.length - 1) / (stream.previewFps || 5)));
+  useEffect(() => { setTime(0); setPlaying(false); }, [run.id]);
+  useEffect(() => {
+    if (!playing) return undefined;
+    const timer = window.setInterval(() => setTime((current) => Math.min(duration, current + 0.1)), 100);
+    return () => window.clearInterval(timer);
+  }, [playing, duration]);
+  useEffect(() => { if (time >= duration) setPlaying(false); }, [time, duration]);
+  if (!run.isMulti && !streams[0].previewFrames.length) return <video className="video-player" controls preload="metadata" src={run.videoUrl}>Your browser does not support video playback.</video>;
+  return <div className="footage-player" data-recording-id={run.id}>
+    <div className={run.isMulti ? "footage-streams footage-streams-pair" : "footage-streams"}>
+      {streams.map((stream) => {
+        const frames = stream.previewFrames;
+        const index = Math.min(Math.floor(time * (stream.previewFps || 5)), Math.max(0, frames.length - 1));
+        return <section className="footage-camera" key={stream.id}>
+          <div className="footage-camera-label"><Video size={15} /><span>{stream.label}</span></div>
+          {frames.length ? <img className="footage-image" src={frames[index]} alt={`${stream.label} annotated video`} /> : <div className="empty-state">No preview available for this camera.</div>}
+        </section>;
+      })}
+    </div>
+    <div className="frame-controls">
+      <button className="frame-play" disabled={!duration} onClick={() => { if (time >= duration) setTime(0); setPlaying((value) => !value); }} aria-label={playing ? "Pause footage" : "Play footage"}>{playing ? <Pause size={17} fill="currentColor" /> : <Play size={17} fill="currentColor" />}</button>
+      <span>{clipTime(time)}</span><input aria-label="Footage position" type="range" min="0" max={duration || 1} step="0.1" value={time} disabled={!duration} onChange={(event) => setTime(Number(event.target.value))} /><span>{clipTime(duration)}</span>
+    </div>
+    <p className="footage-caption">Annotated preview{run.isMulti ? " · Shared position within each clip; shorter clips hold their last image." : ""}</p>
+  </div>;
+}
+
+function ImportantCounts({ run }) {
+  const views = run.isMulti ? run.streams : [{ id: "video", label: "Selected video", peakCount: run.metrics.peakCount }];
+  return <div className="important-counts">
+    {views.map((view) => <div key={view.id}><span>{view.label}</span><strong>{number(view.peakCount)} <small>people</small></strong><p>Highest recorded count in this view</p></div>)}
+    <div><span>Crowd alerts</span><strong>{number(run.metrics.alertCount)}</strong><p>Recorded threshold events</p></div>
+  </div>;
+}
+
+function FocusedPanel({ mode, run, data }) {
+  if (mode === "video-runs") return <div className="plain-result"><CheckCircle2 size={18} /><div><strong>Playback stays on your selected footage</strong><p>Use the timeline to review the annotated clips. Switch sections freely; the recording and playback position stay the same.</p></div></div>;
+  if (mode === "overview") return <div className="plain-result"><CheckCircle2 size={18} /><div><strong>Analysis complete</strong><p>{run.isMulti ? "Review each camera’s peak count separately. A person visible in both views may be counted in each." : "Review the recorded peak count and any crowd alerts."}</p></div></div>;
+  if (mode === "alerts") return <section className="focused-panel"><h2>{run.metrics.alertCount ? "Recorded crowd alerts" : "No crowd alerts recorded"}</h2><p>Alerts are based on the configured limit for each camera.</p><AlertHistory alerts={run.alerts} /></section>;
+  if (mode === "tracking") return <section className="focused-panel"><h2>Crowd activity</h2><p>Peak counts describe people visible at one time, rather than unique visitors over the whole recording.</p>{run.isMulti ? <div className="camera-activity-list">{run.streams.map((stream) => <div key={stream.id}><span>{stream.label}</span><strong>Up to {number(stream.peakCount)} people</strong></div>)}</div> : run.timeline?.length ? <OccupancyChart timeline={run.timeline} /> : <p>No crowd activity was recorded.</p>}</section>;
+  if (mode === "development") return <section className="focused-panel"><h2>Working prototype · validation continues</h2><p>Video analysis, crowd summaries and alerts are available. We are testing detection on more representative scenes before claiming final accuracy.</p><p>{data.training?.status === "completed" ? "The latest training experiment has finished. The stronger previous model remains our aerial candidate." : "Training updates are available in the detailed view."}</p><details className="metric-details"><summary>Training details</summary><TrainingProgress training={data.training} /></details></section>;
+  if (mode === "benchmarks") return <section className="focused-panel"><h2>Research comparisons</h2><p>These benchmark results describe separate experiments, rather than an accuracy score for the footage playing above.</p><details className="metric-details"><summary>Open ground-detector comparison</summary><GroundBenchmark benchmark={data.groundBenchmark} /></details><FullMotBenchmark benchmark={data.benchmark} /></section>;
+  if (mode === "performance") return <section className="focused-panel"><h2>Technical details</h2><details className="metric-details"><summary>Processing information</summary><p>{run.detector} · {number(run.metrics.frames)} processed frames · {number(run.metrics.processingFps, 2)} frames/second</p><PerformanceWorkspace run={run} metrics={run.metrics} /></details></section>;
+  if (mode === "review") return <section className="focused-panel"><h2>Saved appearance review</h2><p>Similar appearance does not confirm that two people are the same person.</p>{run.isMulti ? <details className="metric-details"><summary>Open existing review candidates</summary><ReIdCandidates reid={run.reid} /></details> : <p>This recording has one camera view.</p>}</section>;
+  return null;
+}
 
 function number(value, digits = 0) {
   return new Intl.NumberFormat("en-IN", { maximumFractionDigits: digits }).format(value ?? 0);
@@ -349,107 +410,103 @@ function UploadRunPanel({ onCompleted, initiallyOpen = false }) {
 export default function DashboardClient() {
   const [data, setData] = useState({ runs: [], activeRun: null });
   const [service, setService] = useState({ available: false, runCount: 0 });
-  const [selectedRun, setSelectedRun] = useState("");
+  const [selection, setSelection] = useState(null);
   const [activeSection, setActiveSection] = useState("overview");
-  const [activeWorkspace, setActiveWorkspace] = useState("review");
+  const [mobileOpen, setMobileOpen] = useState(false);
   const [loading, setLoading] = useState(true);
-  const [refreshedAt, setRefreshedAt] = useState(null);
+  const [error, setError] = useState("");
 
-  async function loadDashboard() {
+  const loadDashboard = useCallback(async () => {
     setLoading(true);
     try {
-      const [dashboardResponse, serviceResponse] = await Promise.all([
-        fetch("/api/dashboard", { cache: "no-store" }),
-        fetch("/api/service-health", { cache: "no-store" }),
+      const [dashboardResult, serviceResult] = await Promise.allSettled([
+        fetch("/api/dashboard", { cache: "no-store", signal: AbortSignal.timeout(15000) }),
+        fetch("/api/service-health", { cache: "no-store", signal: AbortSignal.timeout(3000) }),
       ]);
+      if (dashboardResult.status !== "fulfilled" || !dashboardResult.value.ok) throw new Error("Could not load your saved footage. Please try Refresh.");
+      const dashboardResponse = dashboardResult.value;
       const next = await dashboardResponse.json();
       setData(next);
-      if (serviceResponse.ok) setService(await serviceResponse.json());
-      setSelectedRun((current) => current || next.activeRun?.id || "");
-      setRefreshedAt(new Date());
+      if (serviceResult.status === "fulfilled" && serviceResult.value.ok) setService(await serviceResult.value.json());
+      let stored = null;
+      try { stored = JSON.parse(window.localStorage.getItem(selectionStorageKey)); } catch { /* Browser storage can be unavailable. */ }
+      setSelection((current) => chooseSelection(next.runs, current, stored));
+      setError("");
+      return next;
+    } catch (problem) {
+      setError(problem.message || "Could not load saved footage.");
+      return null;
     } finally {
       setLoading(false);
     }
-  }
+  }, []);
 
   useEffect(() => {
     loadDashboard();
-  }, []);
+  }, [loadDashboard]);
 
-  const run = useMemo(
-    () => data.runs.find((item) => item.id === selectedRun) ?? data.activeRun,
-    [data, selectedRun],
-  );
-  const metrics = run?.metrics;
+  useEffect(() => {
+    if (selection) {
+      try { window.localStorage.setItem(selectionStorageKey, JSON.stringify(selection)); } catch { /* Selection still works for this visit. */ }
+    }
+  }, [selection]);
+
+  const recordings = useMemo(() => recordingsFromRuns(data.runs), [data.runs]);
+  const run = useMemo(() => findSelectedRun(data.runs, selection), [data.runs, selection]);
+  const selectedRecording = recordings.find((item) => item.key === selection?.recordingKey);
   const goToSection = (section) => {
     setActiveSection(section);
-    const workspaceForSection = { tracking: "tracking", alerts: "tracking", development: "development", benchmarks: "benchmarks" }[section];
-    if (workspaceForSection) setActiveWorkspace(workspaceForSection);
-    const target = workspaceForSection ? "supporting-workspace" : section;
-    requestAnimationFrame(() => document.getElementById(target)?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    setMobileOpen(false);
+    requestAnimationFrame(() => document.getElementById("footage-workspace")?.scrollIntoView({ behavior: "smooth", block: "start" }));
   };
-  const selectUploadedRun = async (runId) => {
-    await loadDashboard();
-    setSelectedRun(runId);
-  };
+  const selectUploadedRun = useCallback(async (runId) => {
+    const next = await loadDashboard();
+    const uploaded = next?.runs.find((item) => item.id === runId);
+    if (uploaded) { setSelection({ runId, recordingKey: recordingKey(uploaded) }); setActiveSection("overview"); }
+  }, [loadDashboard]);
 
   return (
-    <main className="shell">
-      <aside className="sidebar">
+    <main className="shell focused-shell">
+      <aside className={mobileOpen ? "sidebar sidebar-open" : "sidebar"}>
         <div className="brand"><span className="brand-mark"><Eye size={20} /></span><span>Three Eyed Raven</span></div>
-        <button className="search-box"><Search size={18} /><span>Search project...</span><kbd>⌘K</kbd></button>
+        <p className="sidebar-intro">Your footage. Clearer crowd insights.</p>
         <div className="side-label">Workspace</div>
         <nav>
           {navItems.map(([id, Icon, label]) => (
-            <button key={label} onClick={() => goToSection(id)} className={activeSection === id ? "nav-item nav-item-active" : "nav-item"}><Icon size={18} />{label}</button>
+            <button key={label} aria-current={activeSection === id ? "page" : undefined} onClick={() => goToSection(id)} className={activeSection === id ? "nav-item nav-item-active" : "nav-item"}><Icon size={18} />{label}</button>
           ))}
         </nav>
+        <details className="advanced-nav"><summary>Advanced</summary><nav>{advancedNav.map(([id, Icon, label]) => <button key={id} aria-current={activeSection === id ? "page" : undefined} onClick={() => goToSection(id)} className={activeSection === id ? "nav-item nav-item-active" : "nav-item"}><Icon size={18} />{label}</button>)}</nav></details>
         <div className="sidebar-foot card">
           <span className="eyebrow">PROJECT STATUS</span>
-          <strong>Prototype validated</strong>
-          <p>Multi-camera tracking, review-only Re-ID, alerting, API persistence, and evaluation tooling are working.</p>
-          <div className="progress-track"><span className="progress-75" /></div>
-          <small>Phase 3 of 4 · field validation next</small>
+          <strong>Research prototype</strong>
+          <p>Video analysis is available. Validation on more scenes continues.</p>
         </div>
       </aside>
+      {mobileOpen && <button className="navigation-backdrop" aria-label="Close navigation" onClick={() => setMobileOpen(false)} />}
 
       <section className="app-area">
         <header className="topbar">
-          <button className="icon-button mobile-menu" aria-label="Open menu"><Menu size={20} /></button>
-          <div className="project-switch"><span className={service.available ? "status-dot status-dot-online" : "status-dot"} /> Crowd Intelligence <ChevronDown size={16} /></div>
-          <div className="top-actions"><a className="demo-mode" href="/training">Training progress</a><button className="icon-button"><Bell size={19} /><i /></button><button className="icon-button"><ShieldCheck size={19} /></button></div>
+          <button className="icon-button mobile-menu" aria-label="Open menu" aria-expanded={mobileOpen} onClick={() => setMobileOpen((open) => !open)}><Menu size={20} /></button>
+          <div className="project-switch"><span className={service.available ? "status-dot status-dot-online" : "status-dot"} /> Crowd Intelligence</div>
+          <div className="top-actions"><span className="subtle-pill">Local workspace</span><button className="icon-button" aria-label="Show crowd alerts" onClick={() => goToSection("alerts")}><Bell size={19} /></button></div>
         </header>
 
-          <div className="content">
-            <div className={service.available ? "service-status service-status-online" : "service-status"}><span>{service.available ? "Run service online" : "Run service unavailable"}</span><small>{service.available ? `${number(service.runCount)} completed run${service.runCount === 1 ? "" : "s"} exposed by FastAPI` : "Dashboard is reading local artifacts directly"}</small></div>
+          <div id="footage-workspace" className="content focused-content">
             <div className="page-heading">
-            <div><span className="eyebrow">SURVEILLANCE ANALYTICS</span><h1>Dashboard</h1><p>{relativeTime(run?.updatedAt)}</p></div>
+            <div><span className="eyebrow">YOUR FOOTAGE</span><h1>{modeLabel(activeSection)}</h1></div>
             <div className="heading-actions">
-              <label className="run-select"><Radio size={17} /><select value={run?.id ?? ""} onChange={(event) => setSelectedRun(event.target.value)}>{data.runs.map((item) => <option key={item.id} value={item.id}>{item.label}</option>)}</select><ChevronDown size={16} /></label>
-              <button className="primary-button" onClick={loadDashboard} disabled={loading}><RefreshCw size={17} className={loading ? "spin" : ""} /> Refresh</button>
+              <button className="secondary-button" onClick={loadDashboard} disabled={loading}><RefreshCw size={16} className={loading ? "spin" : ""} /> Refresh</button>
             </div>
           </div>
-
-          {!run ? <EmptyState /> : <>
-            <UploadRunPanel onCompleted={selectUploadedRun} initiallyOpen={!run.hasVideo} />
-            <div id="overview" className="metric-grid">
-              <MetricCard icon={Video} label="Processed frames" value={number(metrics.frames)} note={`${metrics.resolution} source resolution`} />
-              <MetricCard icon={Activity} label="Peak visible tracks" value={number(metrics.peakCount)} note={run.isMulti ? "In one camera; not added across views" : `Observed around frame ${number(metrics.peakFrame)}`} accent />
-              <MetricCard icon={Gauge} label={run.isMulti ? "Aggregate throughput" : "Processing speed"} value={`${number(metrics.processingFps, 2)} FPS`} note={run.isMulti ? "Combined speed across both feeds" : `${number(metrics.duration, 1)} seconds of compute`} />
-              <MetricCard icon={Cpu} label="Local trajectory IDs" value={number(metrics.uniqueTracks)} note={run.isMulti ? "Camera-local lifetime IDs, not people" : `${number(metrics.averageConfidence * 100, 1)}% mean detection confidence`} />
-            </div>
-
-            {run.isMulti && <CrossCameraConclusion reid={run.reid} />}
-
-            <div className="content-grid">
-              <section id="video-runs" className="card video-card">
-                <div className="card-heading"><div><span className="eyebrow">ANNOTATED OUTPUT</span><h2>Tracking playback</h2><p>{run.detector ?? "Detector not recorded"}</p></div><span className="live-badge"><span /> Recorded run</span></div>
-                {run.hasVideo ? (run.isMulti ? <MultiStreamPlayer streams={run.streams} sourceId={run.id} /> : <FramePlayer frames={run.previewFrames} videoUrl={run.videoUrl} sourceId={run.id} previewFps={run.previewFps} />) : <EmptyState />}
-                <div className="video-footer"><span><CheckCircle2 size={16} /> {run.isMulti ? "Both feeds processed with independent local trackers" : "Detection & local tracking completed"}</span>{!run.isMulti && <a href={run.videoUrl} download><Download size={16} /> Download MP4</a>}</div>
-              </section>
-            </div>
-            <SupportingWorkspace run={run} data={data} metrics={metrics} refreshedAt={refreshedAt} activePanel={activeWorkspace} onPanelChange={setActiveWorkspace} />
-          </>}
+          {error && <p className="upload-message upload-message-error" role="alert">{error}</p>}
+          <div className="selected-footage-bar"><div><Video size={18} /><span><small>Selected footage · stays the same across all views</small><strong>{selectedRecording?.label ?? (loading ? "Loading your footage…" : "Choose a recording")}</strong></span></div><details className="footage-picker"><summary>Change footage <ChevronDown size={14} /></summary><div className="footage-options">{recordings.map((recording) => <button key={recording.key} aria-pressed={recording.key === selection?.recordingKey} onClick={(event) => { setSelection({ runId: recording.run.id, recordingKey: recording.key }); event.currentTarget.closest("details").open = false; }}>{recording.label}</button>)}{!recordings.length && <p>No saved recordings yet. Upload a pair below.</p>}</div></details></div>
+          <UploadRunPanel onCompleted={selectUploadedRun} initiallyOpen={!loading && !recordings.length} />
+          {run ? <>
+            <section className="card video-card focused-video-card"><FootagePlayer run={run} />{!run.isMulti && <div className="video-footer"><a href={run.videoUrl} download><Download size={15} /> Download annotated video</a></div>}</section>
+            <ImportantCounts run={run} />
+            <div className="card focused-result" aria-live="polite"><FocusedPanel mode={activeSection} run={run} data={data} /></div>
+          </> : <div className="empty-state"><Video size={26} /><strong>{loading ? "Loading your recording…" : selection ? "The selected recording is unavailable" : "Upload footage to get started"}</strong><span>{selection && !loading ? "Use Change footage to choose another recording." : "Choose aerial and ground clips in the uploader."}</span></div>}
         </div>
       </section>
     </main>
