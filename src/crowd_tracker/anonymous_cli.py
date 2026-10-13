@@ -7,10 +7,12 @@ import json
 import math
 import subprocess
 import time
+from dataclasses import asdict, replace
 from pathlib import Path
 
 from .extended_detection_cli import atomic_json, now
 from .storage import RunStore
+from .detection_profiles import DetectionProfile, predict_boxes
 
 
 def count_boxes(boxes, width, height):
@@ -37,8 +39,12 @@ def validate_config(config):
     for camera in cameras:
         if not Path(camera["source"]).is_file() or not Path(camera["model"]).is_file():
             raise ValueError(f"Source or checkpoint missing for {camera['id']}")
-        if camera.get("imgsz", 640) not in (640, 960):
-            raise ValueError("Use a measured laptop resolution: 640 or 960")
+        if camera.get("detection_profile"):
+            profile = DetectionProfile(**camera["detection_profile"])
+            if Path(profile.checkpoint).resolve() != Path(camera["model"]).resolve() or profile.imgsz != camera.get("imgsz"):
+                raise ValueError("Approved profile must match the camera checkpoint and resolution")
+        elif camera.get("imgsz", 640) not in (640, 960):
+            raise ValueError("Higher resolutions require an explicit measured anonymous detector profile")
     if not 0 < config.get("confidence_threshold", .35) < 1:
         raise ValueError("Invalid confidence threshold")
     if any(key.startswith("reid") or key == "tracker" for key in config):
@@ -104,6 +110,9 @@ def analyse_camera(camera, config, output, progress):
         device = config.get("device", "auto")
         if device == "auto":
             device = 0 if torch.cuda.is_available() else "cpu"
+        profile = DetectionProfile(**camera["detection_profile"]) if camera.get("detection_profile") else None
+        if profile and str(device) == "cpu":
+            profile = replace(profile, fp16=False)
         count = peak = total_detections = 0
         with (directory / "counts.jsonl").open("w", encoding="utf-8") as counts:
             while config.get("max_frames_per_camera") is None or count < config["max_frames_per_camera"]:
@@ -111,11 +120,14 @@ def analyse_camera(camera, config, output, progress):
                 if not ok:
                     break
                 source_ms = capture.get(cv2.CAP_PROP_POS_MSEC)
-                result = model.predict(frame, imgsz=camera.get("imgsz", 640),
-                                       conf=config.get("confidence_threshold", .35), iou=.5,
-                                       max_det=1000, classes=[0], device=device,
-                                       verbose=False, save=False)[0]
-                boxes = count_boxes(result.boxes.data[:, :5].detach().cpu().tolist(), width, height)
+                threshold = config.get("confidence_threshold", .35)
+                if profile:
+                    raw = [box for box in predict_boxes(model, frame, profile, device=device) if box[4] >= threshold]
+                else:
+                    result = model.predict(frame, imgsz=camera.get("imgsz", 640), conf=threshold, iou=.5,
+                                           max_det=1000, classes=[0], device=device, verbose=False, save=False)[0]
+                    raw = result.boxes.data[:, :5].detach().cpu().tolist()
+                boxes = count_boxes(raw, width, height)
                 detected = len(boxes)
                 peak = max(peak, detected)
                 total_detections += detected
@@ -141,7 +153,9 @@ def analyse_camera(camera, config, output, progress):
                 "imgsz": camera.get("imgsz", 640), "source_fps": fps, "source_resolution": [width, height],
                 "frames_processed": count, "peak_count": peak, "mean_count": total_detections / count,
                 "duration_seconds": count / fps, "processing_fps": count / elapsed, "alert_count": 0,
-                "alerts_enabled": False, "output_resolution": list(writer.size)}
+                "alerts_enabled": False, "output_resolution": list(writer.size),
+                "runtime_detection_profile": asdict(profile) if profile else None,
+                "runtime_device": str(device)}
     finally:
         capture.release()
         if writer:

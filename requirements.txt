@@ -1,4 +1,4 @@
-ultralytics>=8.3,<9
+ultralytics>=8.4.127,<9
 opencv-python>=4.10,<5
 fastapi>=0.115,<1
 uvicorn[standard]>=0.30,<1

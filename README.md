@@ -4,15 +4,13 @@ This runnable project processes recorded aerial and CCTV video with YOLO person 
 
 ## Current scope
 
-The dashboard's **new uploads** now use an isolated anonymous counting pipeline. It uses the previous best VisDrone-trained YOLO11n at 960px for true aerial views and COCO YOLO11s at 960px for ground views. Choose the general-detector option when the aerial upload is actually ground-level or elevated CCTV. It exports full-frame H.264 video and logs every frame, including zero detections. This path does not produce IDs, appearance crops, or cross-camera matches; existing tracking runs remain available but unchanged.
+The dashboard's **new uploads** use an isolated anonymous counting pipeline. True aerial views keep the previous best VisDrone-trained YOLO11n at 960px. Ground views now use the approved COCO YOLO11x profile at 1536px with multi-scale augmentation and CUDA FP16. Choose the general-detector option when the aerial upload is actually ground-level or elevated CCTV; it uses the same approved ground profile. It exports full-frame H.264 video and logs every frame, including zero detections. This path does not produce IDs, appearance crops, or cross-camera matches; existing tracking runs remain unchanged.
 
-The laptop ground comparison improved development mAP50 from 57.40% (YOLO11n/640) to 64.53% (YOLO11s/960), with count MAE reduced from 6.55 to 4.73. These are sampled MOT17 development scenes, not accuracy measurements for your uploaded footage. See [the laptop improvement report](docs/LAPTOP_IMPROVEMENTS_20261013.md).
+Ground development mAP50 reached **70.96%**, versus 64.53% for YOLO11s/960 on the same 78 report images. Recall improved from 53.68% to 65.91%; adjusted count MAE fell from 4.73 to 2.83. This accuracy-first profile runs at about **3.47 decode+predict FPS** on the RTX 3050 laptop: offline analysis, not live real-time processing. These repeatedly inspected MOT17 scenes are **development evidence, not independent test results or uploaded-video accuracy**. Aerial scores and identity-matching performance did not improve in this experiment. See [the measured 70% target report](docs/GROUND_70_TARGET_20261013.md).
 
 - Recorded video input only; live RTSP/CCTV and drone feeds come after this offline baseline is evaluated.
 - `person` detections only (COCO class 0).
-- Stable **local** track IDs within one camera stream. A track ID is not a verified real-world identity.
-- Polygon-zone occupancy and threshold alerts.
-- Cross-camera appearance ranking is review-only; it never merges IDs or asserts a real-world identity.
+- Legacy runs have **local** track IDs, polygon-zone occupancy/alerts, and review-only cross-camera appearance ranking. These features are not part of new anonymous uploads; a track ID is not a verified identity.
 - A Next.js dashboard reads the local artifacts and presents playback, metrics, alerts, and review evidence.
 
 For anonymous analysis from the terminal, copy `config.anonymous.example.json`, supply the two video paths and available checkpoints, and run `python -m crowd_tracker.anonymous_cli --config config.anonymous.json` with `PYTHONPATH=src`. Use `device: "cpu"` if required. The aerial checkpoint is a local training artifact and is not bundled in Git. Missing checkpoints fail explicitly instead of silently choosing another model. New anonymous runs have no crowd-alert limit configured; the UI displays **Off**, not a misleading zero-alert safety result.
@@ -29,6 +27,14 @@ python -m venv .venv
 python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
+
+New ground uploads require the official `yolo11x.pt` weight in the project root (weights are not committed to Git). From that root, download it once with:
+
+```powershell
+python -c "from ultralytics import YOLO; YOLO('yolo11x.pt')"
+```
+
+`ground_detection_policy.json` records the measured settings and expected checkpoint SHA-256. The uploader verifies it before analysis and fails explicitly if the weight is missing or changed. It never silently substitutes another detector. CPU execution uses FP32 and will be much slower; the recorded benchmark used CUDA FP16.
 
 Copy `config.example.json` to a local configuration (for example, `config.json`), set `source` to a video file, then run:
 

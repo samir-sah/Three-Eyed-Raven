@@ -6,6 +6,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { spawn } from "node:child_process";
 import { readTrainingExperiment } from "./training-status.js";
+import { groundCameraConfig } from "./detection-policy.mjs";
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..");
 const UPLOAD_ROOT = path.join(PROJECT_ROOT, "data", "uploads");
@@ -107,7 +108,8 @@ export async function startUploadRun(formData) {
   const maxFrames = rawMaxFrames ? Number(rawMaxFrames) : null;
   if (maxFrames !== null && (!Number.isInteger(maxFrames) || maxFrames < 1 || maxFrames > 20000)) throw new Error("Maximum frames must be a whole number between 1 and 20,000, or blank for the full videos.");
   if (aerialProfile === "aerial" && !existsSync(AERIAL_CHECKPOINT)) throw new Error("The measured aerial checkpoint is missing. Restore its saved best.pt before starting an analysis.");
-  if (!existsSync(path.join(PROJECT_ROOT, "yolo11s.pt"))) throw new Error("The ground-detector checkpoint yolo11s.pt is missing.");
+  const groundConfig = await groundCameraConfig(PROJECT_ROOT);
+  if (!existsSync(groundConfig.model)) throw new Error("The approved ground-detector checkpoint is missing. See the setup instructions before starting analysis.");
   await mkdir(UPLOAD_ROOT, { recursive: true });
   let lock;
   try { lock = await open(UPLOAD_LOCK, "wx"); }
@@ -129,8 +131,9 @@ export async function startUploadRun(formData) {
   const config = {
     output_dir: path.join("artifacts", runId), device: "auto", confidence_threshold: 0.35,
     max_frames_per_camera: maxFrames,
-    cameras: [{ id: "aerial", label: aerialProfile === "aerial" ? "Aerial / drone view" : "Camera A · ground / elevated view", source: aerialPath, model: aerialProfile === "aerial" ? AERIAL_CHECKPOINT : path.join(PROJECT_ROOT, "yolo11s.pt"), imgsz: 960 },
-      { id: "ground", source: groundPath, model: path.join(PROJECT_ROOT, "yolo11s.pt"), imgsz: 960 }],
+    cameras: [{ id: "aerial", label: aerialProfile === "aerial" ? "Aerial / drone view" : "Camera A · ground / elevated view", source: aerialPath,
+      ...(aerialProfile === "aerial" ? { model: AERIAL_CHECKPOINT, imgsz: 960 } : groundConfig) },
+      { id: "ground", source: groundPath, ...groundConfig }],
   };
   await writeFile(configPath, JSON.stringify(config, null, 2), "utf8");
   await writeFile(jobPath(runId), JSON.stringify({

@@ -1,10 +1,12 @@
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import patch
+from types import SimpleNamespace
+from unittest.mock import Mock, patch
 
-from crowd_tracker.anonymous_cli import count_boxes, validate_config, run, BrowserVideoWriter
+from crowd_tracker.anonymous_cli import analyse_camera, count_boxes, validate_config, run, BrowserVideoWriter
 
 
 class AnonymousTests(unittest.TestCase):
@@ -26,6 +28,138 @@ class AnonymousTests(unittest.TestCase):
             for value in (True, 0, -1, 20001):
                 with self.assertRaises(ValueError):
                     validate_config({**config, "max_frames_per_camera": value})
+
+    def test_high_resolution_requires_anonymous_profile_matching_weights(self):
+        with tempfile.TemporaryDirectory() as folder:
+            file = Path(folder) / "fixture"
+            file.touch()
+            profile = {"name": "validated_tta", "checkpoint": str(file), "imgsz": 1536, "augment": True}
+            cameras = [{"id": camera, "source": str(file), "model": str(file), "imgsz": 1536, "detection_profile": profile} for camera in ("aerial", "ground")]
+            self.assertEqual(validate_config({"cameras": cameras})["cameras"], cameras)
+            cameras[0] = {**cameras[0], "imgsz": 960}
+            with self.assertRaises(ValueError):
+                validate_config({"cameras": cameras})
+            cameras[0] = {**cameras[0], "imgsz": 1536, "detection_profile": None}
+            with self.assertRaises(ValueError):
+                validate_config({"cameras": cameras})
+
+    def test_profile_checkpoint_must_match_camera_checkpoint(self):
+        with tempfile.TemporaryDirectory() as folder:
+            source, model, other = (Path(folder) / name for name in ("video.mp4", "measured.pt", "different.pt"))
+            for file in (source, model, other):
+                file.touch()
+            profile = {"name": "measured_960", "checkpoint": str(other), "imgsz": 960}
+            cameras = [{"id": camera, "source": str(source), "model": str(model), "imgsz": 960,
+                        "detection_profile": profile} for camera in ("aerial", "ground")]
+            with self.assertRaisesRegex(ValueError, "match the camera checkpoint"):
+                validate_config({"cameras": cameras})
+
+    def _mock_profile_camera(self, predictions, *, device="auto", cuda_available=False):
+        """Exercise real annotation/count code without a model, codec or GPU call."""
+        import cv2
+        import numpy as np
+
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            output = root / "output"
+            output.mkdir()
+            source, checkpoint = root / "video.mp4", root / "measured.pt"
+            source.touch()
+            checkpoint.touch()
+            profile = {"name": "measured_tta", "checkpoint": str(checkpoint), "imgsz": 1536,
+                       "tile_size": 0, "augment": True, "fp16": True, "end2end": False}
+            camera = {"id": "ground", "source": str(source), "model": str(checkpoint), "imgsz": 1536,
+                      "detection_profile": profile}
+            config = {"device": device, "confidence_threshold": .35, "max_frames_per_camera": len(predictions)}
+            read_index = 0
+
+            def read_frame():
+                nonlocal read_index
+                read_index += 1
+                return True, np.zeros((80, 100, 3), dtype=np.uint8)
+
+            def capture_property(key):
+                return {cv2.CAP_PROP_FPS: 10, cv2.CAP_PROP_FRAME_WIDTH: 100,
+                        cv2.CAP_PROP_FRAME_HEIGHT: 80, cv2.CAP_PROP_POS_MSEC: read_index * 100}[key]
+
+            capture = Mock()
+            capture.isOpened.return_value = True
+            capture.read.side_effect = read_frame
+            capture.get.side_effect = capture_property
+            frames = []
+            writer = Mock(size=(100, 80))
+            writer.write.side_effect = lambda frame: frames.append(frame.copy())
+            model = SimpleNamespace(names={0: "person"}, predict=Mock())
+            constructor = Mock(return_value=model)
+            fake_ultralytics = SimpleNamespace(YOLO=constructor)
+            fake_torch = SimpleNamespace(cuda=SimpleNamespace(
+                is_available=Mock(return_value=cuda_available), empty_cache=Mock()))
+            with patch.dict(sys.modules, {"ultralytics": fake_ultralytics, "torch": fake_torch}), \
+                 patch("cv2.VideoCapture", return_value=capture), \
+                 patch("cv2.rectangle", wraps=cv2.rectangle) as rectangles, \
+                 patch("crowd_tracker.anonymous_cli.BrowserVideoWriter", return_value=writer), \
+                 patch("crowd_tracker.anonymous_cli.predict_boxes", side_effect=predictions) as predict:
+                summary = analyse_camera(camera, config, output, output / "progress.json")
+            rows = [json.loads(line) for line in (output / "ground" / "counts.jsonl").read_text().splitlines()]
+            files = [file.name for file in (output / "ground").iterdir()]
+            constructor.assert_called_once_with(str(checkpoint))
+            model.predict.assert_not_called()
+            capture.release.assert_called_once()
+            writer.close.assert_called_once_with(False)
+            self.assertEqual(capture.read.call_count, len(predictions))
+            self.assertEqual(camera["detection_profile"], profile)
+            return summary, rows, frames, predict.call_args_list, rectangles.call_args_list, files
+
+    def test_profile_counts_and_exported_boxes_share_the_point35_filter(self):
+        predictions = [
+            [[5, 50, 25, 70, .9], [30, 50, 40, 60, .35], [50, 50, 60, 60, .34999],
+             [-1, 50, 10, 90, .8], [4, 4, 3, 5, .99], [0, 0, 1, 1, 1.5]],
+            [],
+            [[60, 50, 70, 60, .35]],
+        ]
+        summary, rows, frames, calls, rectangles, files = self._mock_profile_camera(predictions)
+        self.assertEqual([row["count"] for row in rows], [3, 0, 1])
+        self.assertEqual(rows[0]["boxes_scores"], [[5, 50, 25, 70, .9], [30, 50, 40, 60, .35], [0, 50, 10, 80, .8]])
+        self.assertEqual(rows[1]["boxes_scores"], [])
+        self.assertEqual(rows[2]["boxes_scores"], [[60, 50, 70, 60, .35]])
+        self.assertTrue(all(row["count"] == len(row["boxes_scores"]) for row in rows))
+        self.assertEqual([row["frame_index"] for row in rows], [0, 1, 2])
+        self.assertEqual([row["timestamp_seconds"] for row in rows], [0, .1, .2])
+        self.assertEqual([row["source_timestamp_seconds"] for row in rows], [.1, .2, .3])
+        self.assertEqual(summary["frames_processed"], len(frames))
+        self.assertEqual(summary["peak_count"], 3)
+        self.assertEqual(summary["mean_count"], 4 / 3)
+        self.assertEqual(summary["duration_seconds"], .3)
+        exported = [(call.args[1], call.args[2]) for call in rectangles
+                    if (call.args[1], call.args[2]) != ((8, 8), (220, 43))]
+        self.assertEqual(exported, [((5, 50), (25, 70)), ((30, 50), (40, 60)),
+                                    ((0, 50), (10, 80)), ((60, 50), (70, 60))])
+        self.assertEqual(files, ["counts.jsonl"])
+        self.assertEqual(len(calls), 3)
+        self.assertTrue(all(len(box) == 5 for row in rows for box in row["boxes_scores"]))
+
+    def test_auto_cpu_profile_uses_fp32_and_preserves_approved_input(self):
+        summary, _, _, calls, _, _ = self._mock_profile_camera([[]], cuda_available=False)
+        runtime = calls[0].args[2]
+        self.assertFalse(runtime.fp16)
+        self.assertTrue(runtime.augment)
+        self.assertEqual(runtime.imgsz, 1536)
+        self.assertEqual(calls[0].kwargs, {"device": "cpu"})
+        self.assertEqual(summary["runtime_device"], "cpu")
+        self.assertFalse(summary["runtime_detection_profile"]["fp16"])
+
+    def test_explicit_cpu_keeps_fp32_even_when_cuda_is_available(self):
+        summary, _, _, calls, _, _ = self._mock_profile_camera([[]], device="cpu", cuda_available=True)
+        self.assertFalse(calls[0].args[2].fp16)
+        self.assertEqual(calls[0].kwargs, {"device": "cpu"})
+        self.assertEqual(summary["runtime_device"], "cpu")
+
+    def test_cuda_profile_keeps_measured_fp16_without_executing_gpu(self):
+        summary, _, _, calls, _, _ = self._mock_profile_camera([[]], cuda_available=True)
+        self.assertTrue(calls[0].args[2].fp16)
+        self.assertEqual(calls[0].kwargs, {"device": 0})
+        self.assertTrue(summary["runtime_detection_profile"]["fp16"])
+        self.assertEqual(summary["runtime_device"], "0")
 
     def test_summary_and_partial_failure_preserved_without_identity_artifacts(self):
         with tempfile.TemporaryDirectory() as folder:

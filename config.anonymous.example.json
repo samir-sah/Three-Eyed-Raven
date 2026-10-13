@@ -1,6 +1,6 @@
 {
   "output_dir": "artifacts/my_anonymous_pair",
-  "device": "0",
+  "device": "auto",
   "confidence_threshold": 0.35,
   "max_frames_per_camera": 600,
   "cameras": [
@@ -13,8 +13,17 @@
     {
       "id": "ground",
       "source": "S:/path/to/ground-video.mp4",
-      "model": "yolo11s.pt",
-      "imgsz": 960
+      "model": "yolo11x.pt",
+      "imgsz": 1536,
+      "detection_profile": {
+        "name": "yolo11x_1536_tta",
+        "checkpoint": "yolo11x.pt",
+        "imgsz": 1536,
+        "tile_size": 0,
+        "augment": true,
+        "fp16": true,
+        "end2end": false
+      }
     }
   ]
 }

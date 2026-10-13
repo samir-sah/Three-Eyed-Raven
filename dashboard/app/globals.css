@@ -1,6 +1,11 @@
 @import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700&display=swap");
 @import "tailwindcss";
 
+@media (max-width: 760px) {
+  .ground-benchmark .compact-heading { flex-direction: column; gap: 8px; }
+  .ground-benchmark .compact-heading > div { width: 100%; }
+}
+
 /* Footage is shared across modes; keep everyday results compact. */
 .focused-shell .sidebar-intro { margin: -3px 0 24px; color: #858585; font-size: 12px; }
 .focused-shell .side-label { margin-top: 12px; }

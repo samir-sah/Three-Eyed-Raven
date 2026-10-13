@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "scope": "anonymous_detection",
+  "approved": true,
+  "ground": {
+    "profile": {
+      "name": "yolo11x_1536_tta",
+      "checkpoint": "yolo11x.pt",
+      "imgsz": 1536,
+      "tile_size": 0,
+      "augment": true,
+      "fp16": true,
+      "end2end": false
+    }
+  },
+  "evidence": {
+    "experiment": "ground_score_target_20261013_v2",
+    "saved_report_map50": 0.7096419487681966,
+    "checkpoint_sha256": "7bc158aa95c0ebfdd87f70f01653c1131b93e92522dbe15c228bcd742e773a24"
+  }
+}

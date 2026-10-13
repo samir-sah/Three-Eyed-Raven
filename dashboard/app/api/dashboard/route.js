@@ -19,10 +19,11 @@ function safeJson(filePath, fallback) {
   }
 }
 
-function detectorLabel(modelPath) {
+function detectorLabel(modelPath, profile) {
   if (!modelPath) return "Detector not recorded";
   if (String(modelPath).includes("visdrone_person")) return "VisDrone fine-tuned YOLO11n";
-  if (path.basename(String(modelPath)) === "yolo11n.pt") return "YOLO11n (COCO)";
+  const alias = path.basename(String(modelPath)).match(/^(yolo11|yolo26)([nsmxl])\.pt$/);
+  if (alias) return `${alias[1].toUpperCase()}${alias[2]} (COCO)${profile ? ` · ${profile.imgsz}px${profile.augment ? " · multi-scale" : ""}` : ""}`;
   return path.basename(String(modelPath));
 }
 
@@ -317,7 +318,7 @@ function readMultiRun(runId) {
     return {
       id: camera.camera_id,
       label: camera.label || cameraLabel(camera.camera_id),
-      detector: detectorLabel(camera.model ?? fallbackModel),
+      detector: detectorLabel(camera.model ?? fallbackModel, camera.runtime_detection_profile),
       previewFrames: preview.frames,
       previewFps: preview.previewFps,
       videoUrl: existsSync(path.join(cameraDirectory, "browser.mp4")) ? `/api/videos/${encodeURIComponent(runId)}/${encodeURIComponent(camera.camera_id)}` : null,
