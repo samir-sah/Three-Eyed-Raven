@@ -31,11 +31,26 @@ The selected profile improves mAP50 by 7.13 percentage points and recall by 10.4
 
 Stored footage/output selection is preserved across modes and Refresh. Choose the newer analysis explicitly through Change footage; the app does not silently replace a pinned earlier result. Earlier outputs of that same pair remain selectable under Technical details → Saved analyses. Check the aerial profile before uploading new clips.
 
+The corrected demonstration is saved separately as `artifacts/upload_20261013_general_views`, using COCO YOLO11s/960/.35 for both clips and honest labels **Ground-level view** and **Elevated surveillance view**. It preserves the exact original source paths, so it is another saved analysis of the same footage, not a different recording. Its peak detector estimates are 14 and 29 respectively. Every count row matches its recorded boxes; logs contain 74 and 600 frames, and the browser videos report those same frame totals at 30fps and 50fps. No tracking/identity artifacts were generated. These totals verify data consistency only, not human-count accuracy. The user's pinned earlier analysis was not changed.
+
 ## Ground-domain training pilot
 
 `runs/experiments/ground_pilot_20261013` starts from COCO YOLO11s, at 960px, batch 1, workers 0, with a 0.6-hour training budget. It uses 230 anonymous images from scenes 02/04/05 and 44 validation images from scene 10, sampled about twice per second. Report scenes 09/11/13 are not used for training or checkpoint selection, but they were already inspected during previous development. Excluded categories become background during YOLO training because its loss does not support MOT ignore regions; occluded full-body targets remain. This is a small scene-separated pilot, not full-dataset ground training.
 
 The worker saves best/latest checkpoints and compares its candidate against the deployed COCO YOLO11s at matched 960px/.35 settings. No pilot checkpoint is automatically promoted. The training validation mAP and final custom report mAP are different measurements. Completion results appear in its `comparison.json`/`REPORT.md` and the Training page.
+
+### Final pilot outcome: keep the current detector
+
+The pilot completed 38 epochs in 0.397 hours, then evaluated both models. Early stopping was triggered by 20 epochs without improvement; the best checkpoint was selected at epoch 18. This was a normal early stop, not a crash or exhausted hardware. All best/latest/periodic checkpoints and logs remain saved.
+
+| Detector at 960px / confidence .35 | Report mAP50 | Report mAP50–95 | Recall | Precision | Count MAE | Count RMSE |
+|---|---|---|---|---|---|---|
+| Current COCO YOLO11s | 64.53% | 36.94% | 53.68% | 86.33% | 4.73 | 7.19 |
+| Ground-domain pilot | 65.84% | 38.71% | 49.22% | 92.41% | 5.78 | 8.25 |
+
+The pilot is more conservative: its precision improves, but recall loses 4.46 percentage points and count MAE worsens by about 22.2%. The small mAP improvement does not justify replacing the crowd-counting default. We keep **COCO YOLO11s / 960px / .35**. The decision is recorded separately in the experiment's `decision.json` and shown on the Training page, preserving the original scores and metric-only ranking in `comparison.json`.
+
+The best checkpoint's training-validation mAP50 is approximately 69.5% on 44 images from scene 10. The 65.84% figure is the custom detection audit on 78 report images from other scenes. Neither is an independent test result, neither reaches 70%, and neither can be compared directly with the earlier full-VisDrone validation goal. The next useful improvement requires more diverse ground-camera training scenes and an untouched final test set, rather than blindly extending this small pilot.
 
 The first profile process was interrupted when its short-lived sandbox ended; its partial predictions remain in `laptop_ground_profiles_20261013`. The completed comparison was rerun separately outside that sandbox. Neither partial files nor checkpoints were deleted.
 
@@ -44,3 +59,5 @@ The first profile process was interrupted when its short-lived sandbox ended; it
 Python unit tests cover anonymous box clipping, configuration restrictions, scene separation, normalized labels, real browser video encoding, preservation of failures and refusal to overwrite existing outputs. JavaScript tests cover pinned footage, correct count summaries, chart peak retention and byte ranges. The production build succeeds; browser checks verify actual video decoding, playback/end behavior and persistence when changing sections.
 
 The app and training computer must remain powered. Stop training before launching other GPU-heavy tasks. An interrupted upload leaves a lock file in `data/uploads/processing.lock`; inspect its recorded process and job before clearing it. The system never automatically removes a potentially active job's lock.
+
+Final checks after training exited: all **59 Python tests** and **10 JavaScript tests** passed, and the final Next.js production build succeeded. The live dashboard and Training API expose the saved non-promotion decision. No unrelated process was stopped, no previous artifact was overwritten, and no checkpoint was deployed into the legacy tracking or Re-ID paths.

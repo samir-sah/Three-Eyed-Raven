@@ -10,5 +10,7 @@ export function readTrainingExperiment() {
   if (!/^[A-Za-z0-9_]+$/.test(pointer.name ?? "")) throw new Error("Invalid experiment name.");
   const directory = path.join(EXPERIMENTS, pointer.name);
   const status = JSON.parse(readFileSync(path.join(directory, "status.json"), "utf8"));
-  return { ...status, name: pointer.name };
+  const decisionPath = path.join(directory, "decision.json");
+  const decision = existsSync(decisionPath) ? JSON.parse(readFileSync(decisionPath, "utf8")) : null;
+  return { ...status, decision, name: pointer.name };
 }

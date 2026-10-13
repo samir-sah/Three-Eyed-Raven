@@ -120,7 +120,7 @@ function readTrainingProgress() {
         totalEpochs: experiment.totalEpochs ?? 0,
         progress: finished ? 100 : Math.round((experiment.epoch ?? 0) / Math.max(1, experiment.totalEpochs ?? 1) * 100),
         status: finished ? "completed" : experiment.status === "training" ? "running" : experiment.status,
-        lastLine: finished ? `Experiment completed. Validation comparison recommends ${experiment.comparison?.recommended_by_validation_map ?? "reviewing the saved report"}. Candidate checkpoints were not automatically deployed.` : "See Training progress for the current experiment stage.",
+        lastLine: finished ? (experiment.decision?.summary ?? `Experiment completed. Validation comparison recommends ${experiment.comparison?.recommended_by_validation_map ?? "reviewing the saved report"}. Candidate checkpoints were not automatically deployed.`) : "See Training progress for the current experiment stage.",
         metrics: { precision: metrics["metrics/precision(B)"], recall: metrics["metrics/recall(B)"],
           map50: metrics["metrics/mAP50(B)"], map5095: metrics["metrics/mAP50-95(B)"] },
       };
