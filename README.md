@@ -4,12 +4,18 @@ This runnable project processes recorded aerial and CCTV video with YOLO person 
 
 ## Current scope
 
+The dashboard's **new uploads** now use an isolated anonymous counting pipeline. It uses the previous best VisDrone-trained YOLO11n at 960px for true aerial views and COCO YOLO11s at 960px for ground views. Choose the general-detector option when the aerial upload is actually ground-level or elevated CCTV. It exports full-frame H.264 video and logs every frame, including zero detections. This path does not produce IDs, appearance crops, or cross-camera matches; existing tracking runs remain available but unchanged.
+
+The laptop ground comparison improved development mAP50 from 57.40% (YOLO11n/640) to 64.53% (YOLO11s/960), with count MAE reduced from 6.55 to 4.73. These are sampled MOT17 development scenes, not accuracy measurements for your uploaded footage. See [the laptop improvement report](docs/LAPTOP_IMPROVEMENTS_20261013.md).
+
 - Recorded video input only; live RTSP/CCTV and drone feeds come after this offline baseline is evaluated.
 - `person` detections only (COCO class 0).
 - Stable **local** track IDs within one camera stream. A track ID is not a verified real-world identity.
 - Polygon-zone occupancy and threshold alerts.
 - Cross-camera appearance ranking is review-only; it never merges IDs or asserts a real-world identity.
 - A Next.js dashboard reads the local artifacts and presents playback, metrics, alerts, and review evidence.
+
+For anonymous analysis from the terminal, copy `config.anonymous.example.json`, supply the two video paths and available checkpoints, and run `python -m crowd_tracker.anonymous_cli --config config.anonymous.json` with `PYTHONPATH=src`. Use `device: "cpu"` if required. The aerial checkpoint is a local training artifact and is not bundled in Git. Missing checkpoints fail explicitly instead of silently choosing another model. New anonymous runs have no crowd-alert limit configured; the UI displays **Off**, not a misleading zero-alert safety result.
 
 For the fresh anonymous ground-detector comparison, see [the evaluation protocol](docs/DETECTION_EVALUATION_PROTOCOL.md) and [the measured 13 October baseline](docs/GROUND_DETECTION_BASELINE_20261013.md). The dashboard's **Model comparisons** view distinguishes this audit from the historical MOT17 tracking report.
 

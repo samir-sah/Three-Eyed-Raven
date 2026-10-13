@@ -1,0 +1,20 @@
+{
+  "output_dir": "artifacts/my_anonymous_pair",
+  "device": "0",
+  "confidence_threshold": 0.35,
+  "max_frames_per_camera": 600,
+  "cameras": [
+    {
+      "id": "aerial",
+      "source": "S:/path/to/aerial-video.mp4",
+      "model": "runs/experiments/extended_detection_20261012/visdrone_person_960/weights/best.pt",
+      "imgsz": 960
+    },
+    {
+      "id": "ground",
+      "source": "S:/path/to/ground-video.mp4",
+      "model": "yolo11s.pt",
+      "imgsz": 960
+    }
+  ]
+}

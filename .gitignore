@@ -5,7 +5,7 @@ venv/
 .env
 data/
 models/
-artifacts/
+/artifacts/
 runs/
 .build/
 .codex-build/
@@ -13,4 +13,5 @@ runs/
 .chart-data-*/
 *.pt
 config.json
+config.anonymous.json
 multi_config.json

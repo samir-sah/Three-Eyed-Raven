@@ -3,7 +3,11 @@
 import { useState } from "react";
 
 const labels = {
-  coco_yolo11n: "Website detector · COCO YOLO11n",
+  coco_yolo11n: "Previous upload detector · COCO YOLO11n",
+  coco_yolo11n_640: "Previous uploads · YOLO11n · 640px",
+  coco_yolo11s_640: "YOLO11s · 640px",
+  coco_yolo11n_960: "YOLO11n · 960px",
+  coco_yolo11s_960: "New anonymous uploads · YOLO11s · 960px",
   historical_visdrone_50e: "Historical aerial model · 50 epochs",
   extended_visdrone_nano: "Extended aerial YOLO11n",
   experimental_visdrone_small: "Experimental aerial YOLO11s",
@@ -15,17 +19,17 @@ export default function GroundBenchmark({ benchmark }) {
   const [tuned, setTuned] = useState(false);
   if (!benchmark) return <section className="compact-inset"><span className="eyebrow">GROUND DETECTION</span><h2>Fresh comparison pending</h2><p className="benchmark-conclusion">The historical tracking report does not measure the current website detector. A separate detection and counting audit will appear here.</p></section>;
   if (benchmark.status !== "completed") return <section className="compact-inset"><span className="eyebrow">GROUND DETECTION AUDIT</span><h2>{benchmark.status === "failed" ? "Comparison needs attention" : "Comparison in progress"}</h2><p className="benchmark-conclusion">{benchmark.activeModel} · {benchmark.completedImages ?? 0}/{benchmark.totalImages ?? benchmark.images} sampled images. Refresh to see the latest results.</p></section>;
-  const website = benchmark.evaluations.find((item) => item.name === "coco_yolo11n");
+  const website = benchmark.evaluations.find((item) => item.name === "coco_yolo11s_960") ?? benchmark.evaluations.find((item) => item.name === "coco_yolo11n");
   const current = website?.[tuned ? "tuned" : "default"];
   return <section className="compact-inset ground-benchmark">
     <div className="compact-heading"><div><span className="eyebrow">FRESH GROUND DETECTION AUDIT</span><h2>How the actual detectors compare</h2><p>{benchmark.images} sampled images across {benchmark.scenes.length} MOT17 scenes · {new Date(benchmark.updatedAt).toLocaleDateString("en-IN")}</p></div><span className="subtle-pill">Development evaluation</span></div>
-    <p className="benchmark-conclusion">At {tuned ? "a threshold selected on separate calibration scenes" : "the website’s 35% confidence setting"}, the website detector recovered <strong>{pct(current?.recall)}</strong> of annotated pedestrians. Its average count error was <strong>{decimal(current?.count_mae)} people per image</strong> on the report scenes.</p>
+    <p className="benchmark-conclusion">At {tuned ? "a threshold selected on separate calibration scenes" : "the new anonymous-upload 35% confidence setting"}, the ground detector recovered <strong>{pct(current?.recall)}</strong> of annotated pedestrians. Its average count error was <strong>{decimal(current?.count_mae)} people per image</strong> on the report scenes.</p>
     <div className="workspace-tabs" aria-label="Comparison confidence setting"><button type="button" aria-pressed={!tuned} className={!tuned ? "workspace-tab workspace-tab-active" : "workspace-tab"} onClick={() => setTuned(false)}>Website setting</button><button type="button" aria-pressed={tuned} className={tuned ? "workspace-tab workspace-tab-active" : "workspace-tab"} onClick={() => setTuned(true)}>Calibrated thresholds</button></div>
     <div className="benchmark-table-wrap"><table className="benchmark-table"><thead><tr><th>Detector</th><th>Confidence</th><th>Recall ↑</th><th>Precision ↑</th><th>Count error ↓</th><th>mAP50 ↑</th></tr></thead><tbody>{benchmark.evaluations.map((item) => {
       const measured = item[tuned ? "tuned" : "default"];
       return <tr key={item.name}><th scope="row">{labels[item.name] ?? item.name}</th><td>{pct(measured.threshold)}</td><td>{pct(measured.recall)}</td><td>{pct(measured.precision)}</td><td>{decimal(measured.count_mae)}</td><td>{pct(item.detection.map50)}</td></tr>;
     })}</tbody></table></div>
-    <p className="benchmark-conclusion">All models use the same {website?.resolution}px input setting and sampled frames. Metrics above use {current?.images} images from three report scenes; four other scenes select thresholds. Counts follow MOT17’s annotated pedestrian category and exclude ignored regions. No tracker is involved. The upload detector has not been changed.</p>
+    <p className="benchmark-conclusion">Models use the same sampled frames; each row shows its input resolution. Metrics above use {current?.images} images from three report scenes; four other scenes select thresholds. Counts follow MOT17’s annotated pedestrian category and exclude ignored regions. No tracker is involved. New anonymous uploads use YOLO11s at 960px with 35% confidence; legacy tracking runs remain unchanged.</p>
     {tuned && <p className="benchmark-conclusion">Lower thresholds also admit more false detections. A lower count error can hide missed people being offset by incorrect boxes, so compare precision and recall together before changing the website setting.</p>}
     <details className="metric-details"><summary>Understand the scores and limitations</summary><p>Recall means how many annotated people were found. Precision means how many reported boxes were correct. Count error is mean absolute error: lower is better. mAP50 summarizes detection across confidence thresholds, so it stays the same when you switch the operating threshold above.</p><p>{benchmark.protocol.limitations} This custom detection audit is not the official MOTChallenge leaderboard protocol.</p><div className="benchmark-table-wrap"><table className="benchmark-table"><thead><tr><th>Detector</th><th>Count bias</th><th>Count RMSE</th><th>mAP50–95</th><th>Decode + predict FPS</th></tr></thead><tbody>{benchmark.evaluations.map((item) => <tr key={item.name}><th scope="row">{labels[item.name] ?? item.name}</th><td>{decimal(item[tuned ? "tuned" : "default"].count_bias)}</td><td>{decimal(item[tuned ? "tuned" : "default"].count_rmse)}</td><td>{pct(item.detection.map5095)}</td><td>{decimal(item.speed.decode_predict_fps)}</td></tr>)}</tbody></table></div><p>Negative count bias indicates undercounting. The measured speed excludes video playback and website rendering. Checkpoint files and settings are preserved in the experiment report.</p></details>
   </section>;

@@ -1,5 +1,10 @@
 const normaliseSource = (source) => String(source).replaceAll("\\", "/").toLowerCase();
 
+export function footageLabel(run, uploaded = run.id.startsWith("upload_")) {
+  const date = new Date(run.updatedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+  return `${uploaded ? "Uploaded" : "Sample"} ${run.isMulti ? "video pair" : "video"} · ${date}`;
+}
+
 export function recordingKey(run) {
   const sources = run.isMulti ? (run.streams ?? []).map((stream) => stream.source) : [run.metrics?.source];
   if (!sources.length || sources.some((source) => source == null || source === "—")) return `run:${run.id}`;
@@ -18,8 +23,7 @@ export function recordingsFromRuns(runs) {
   return [...groups.values()].map((group) => {
     group.runs.sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt));
     const newest = group.runs[0];
-    const date = new Date(newest.updatedAt).toLocaleString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
-    return { ...group, run: newest, label: `${group.uploaded ? "Uploaded" : "Sample"} ${group.isMulti ? "video pair" : "video"} · ${date}` };
+    return { ...group, run: newest, label: footageLabel(newest, group.uploaded) };
   }).sort((a, b) => Number(b.uploaded) - Number(a.uploaded) || new Date(b.run.updatedAt) - new Date(a.run.updatedAt));
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GroundBenchmark from "./ground-benchmark";
-import { chooseSelection, recordingKey, recordingsFromRuns, selectedRun as findSelectedRun } from "../lib/recordings.mjs";
+import { chooseSelection, footageLabel, recordingKey, recordingsFromRuns, selectedRun as findSelectedRun } from "../lib/recordings.mjs";
 import {
   Activity,
   Bell,
@@ -44,6 +44,53 @@ function clipTime(seconds) {
   return `${Math.floor(value / 60).toString().padStart(2, "0")}:${(value % 60).toString().padStart(2, "0")}`;
 }
 
+function NativeFootagePlayer({ run }) {
+  const videos = useRef({});
+  const [time, setTime] = useState(0);
+  const [playing, setPlaying] = useState(false);
+  const [error, setError] = useState("");
+  const [ready, setReady] = useState(0);
+  const duration = Math.max(...run.streams.map((stream) => stream.duration || 0), 0);
+  const master = run.streams.reduce((best, stream) => stream.duration > (best?.duration || 0) ? stream : best, run.streams[0])?.id;
+  useEffect(() => { setTime(0); setPlaying(false); setError(""); setReady(Object.values(videos.current).filter((video) => video?.readyState >= 1).length); }, [run.id]);
+  useEffect(() => {
+    for (const video of Object.values(videos.current)) {
+      if (!video) continue;
+      if (playing && video.currentTime < video.duration - .04) video.play().catch(() => { setError("Playback could not start. Try Play again."); setPlaying(false); });
+      else video.pause();
+    }
+  }, [playing, ready]);
+  function seek(next) {
+    setTime(next);
+    for (const video of Object.values(videos.current)) {
+      if (video && Number.isFinite(video.duration)) video.currentTime = Math.min(next, Math.max(0, video.duration - .03));
+    }
+  }
+  function update(event) {
+    const next = event.currentTarget.currentTime;
+    setTime(next);
+    for (const [id, video] of Object.entries(videos.current)) {
+      if (id === master || !video || !Number.isFinite(video.duration)) continue;
+      const position = Math.min(next, Math.max(0, video.duration - .03));
+      if (Math.abs(video.currentTime - position) > .3) video.currentTime = position;
+    }
+  }
+  return <div className="footage-player" data-recording-id={run.id}>
+    <div className="footage-streams footage-streams-pair">{run.streams.map((stream) => <section className="footage-camera" key={`${run.id}:${stream.id}`}>
+      <div className="footage-camera-label"><Video size={15} /><span>{stream.label}</span><button className="secondary-button" onClick={() => videos.current[stream.id]?.requestFullscreen?.()} aria-label={`Expand ${stream.label}`}>Expand</button></div>
+      <video className="footage-image" ref={(video) => { videos.current[stream.id] = video; }} src={stream.videoUrl} preload="auto" muted playsInline
+        onLoadedMetadata={() => setReady(Object.values(videos.current).filter((video) => video?.readyState >= 1).length)}
+        onTimeUpdate={stream.id === master ? update : undefined} onEnded={stream.id === master ? () => setPlaying(false) : undefined}
+        onError={() => { setError("This video could not be loaded. Refresh the page or inspect the saved encoding log."); setPlaying(false); }} />
+      <p className="footage-caption">{clipTime(stream.duration)} analysed · {stream.detector.includes("VisDrone") ? "Aerial-specific detector" : "General / ground detector"}</p>
+    </section>)}</div>
+    <div className="frame-controls"><button className="frame-play" disabled={!duration || ready < run.streams.length} onClick={() => { if (time >= duration - .1) seek(0); setError(""); setPlaying((value) => !value); }} aria-label={playing ? "Pause footage" : "Play footage"}>{playing ? <Pause size={17} /> : <Play size={17} />}</button><span>{clipTime(time)}</span><input aria-label="Footage position" type="range" min="0" max={duration || 1} step=".1" value={Math.min(time, duration)} onChange={(event) => seek(Number(event.target.value))} /><span>{clipTime(duration)}</span></div>
+    {error && <p role="alert" className="upload-message upload-message-error">{error}</p>}
+    {ready < run.streams.length && !error && <p role="status" className="footage-caption">Loading videos…</p>}
+    <p className="footage-caption">Full-frame annotated video · Shared elapsed clip time, not synchronized camera clocks. Shorter clips hold their final image.</p>
+  </div>;
+}
+
 function FootagePlayer({ run }) {
   const streams = run.isMulti ? run.streams : [{ id: "video", label: "Selected video", previewFrames: run.previewFrames ?? [], previewFps: run.previewFps }];
   const [time, setTime] = useState(0);
@@ -56,6 +103,7 @@ function FootagePlayer({ run }) {
     return () => window.clearInterval(timer);
   }, [playing, duration]);
   useEffect(() => { if (time >= duration) setPlaying(false); }, [time, duration]);
+  if (run.isMulti && run.streams.every((stream) => stream.videoUrl)) return <NativeFootagePlayer key={run.id} run={run} />;
   if (!run.isMulti && !streams[0].previewFrames.length) return <video className="video-player" controls preload="metadata" src={run.videoUrl}>Your browser does not support video playback.</video>;
   return <div className="footage-player" data-recording-id={run.id}>
     <div className={run.isMulti ? "footage-streams footage-streams-pair" : "footage-streams"}>
@@ -79,19 +127,22 @@ function FootagePlayer({ run }) {
 function ImportantCounts({ run }) {
   const views = run.isMulti ? run.streams : [{ id: "video", label: "Selected video", peakCount: run.metrics.peakCount }];
   return <div className="important-counts">
-    {views.map((view) => <div key={view.id}><span>{view.label}</span><strong>{number(view.peakCount)} <small>people</small></strong><p>Highest recorded count in this view</p></div>)}
-    <div><span>Crowd alerts</span><strong>{number(run.metrics.alertCount)}</strong><p>Recorded threshold events</p></div>
+    {views.map((view) => <div key={view.id}><span>{view.label}</span><strong>{view.countsVerified === false ? "—" : number(view.peakCount)} <small>people</small></strong><p>{view.countsVerified === false ? "Count log unavailable" : "Highest detector estimate in this view"}</p></div>)}
+    <div><span>Crowd alerts</span><strong>{run.alertsEnabled === false ? "Off" : number(run.metrics.alertCount)}</strong><p>{run.alertsEnabled === false ? "No crowd limit configured" : "Recorded threshold events"}</p></div>
   </div>;
 }
 
-function FocusedPanel({ mode, run, data }) {
+function FocusedPanel({ mode, run, data, versions = [], onSelectAnalysis }) {
+  if (mode === "review" && run.analysisType === "anonymous_detection") return <section className="focused-panel"><h2>Anonymous crowd analysis</h2><p>This run counts detections in each view independently. It does not identify people or produce cross-camera match suggestions.</p></section>;
+  if (mode === "alerts" && run.alertsEnabled === false) return <section className="focused-panel"><h2>Crowd alerts are not configured</h2><p>This run records counts only. Zero alerts does not mean that a safety threshold was checked.</p></section>;
+  if (mode === "tracking" && run.analysisType === "anonymous_detection") return <section className="focused-panel"><h2>People detected over time</h2><p>Each point is an image-level count. Counts across views are not a count of unique people.</p><div className="camera-activity-list">{run.streams.map((stream) => <section key={stream.id}><h3>{stream.label}</h3>{stream.countsVerified === false ? <p>Count log unavailable.</p> : <><p>Peak: {number(stream.peakCount)} at {clipTime(stream.peakSeconds)}</p><OccupancyChart timeline={stream.timeline} /></>}</section>)}</div></section>;
   if (mode === "video-runs") return <div className="plain-result"><CheckCircle2 size={18} /><div><strong>Playback stays on your selected footage</strong><p>Use the timeline to review the annotated clips. Switch sections freely; the recording and playback position stay the same.</p></div></div>;
   if (mode === "overview") return <div className="plain-result"><CheckCircle2 size={18} /><div><strong>Analysis complete</strong><p>{run.isMulti ? "Review each camera’s peak count separately. A person visible in both views may be counted in each." : "Review the recorded peak count and any crowd alerts."}</p></div></div>;
   if (mode === "alerts") return <section className="focused-panel"><h2>{run.metrics.alertCount ? "Recorded crowd alerts" : "No crowd alerts recorded"}</h2><p>Alerts are based on the configured limit for each camera.</p><AlertHistory alerts={run.alerts} /></section>;
   if (mode === "tracking") return <section className="focused-panel"><h2>Crowd activity</h2><p>Peak counts describe people visible at one time, rather than unique visitors over the whole recording.</p>{run.isMulti ? <div className="camera-activity-list">{run.streams.map((stream) => <div key={stream.id}><span>{stream.label}</span><strong>Up to {number(stream.peakCount)} people</strong></div>)}</div> : run.timeline?.length ? <OccupancyChart timeline={run.timeline} /> : <p>No crowd activity was recorded.</p>}</section>;
-  if (mode === "development") return <section className="focused-panel"><h2>Working prototype · validation continues</h2><p>Video analysis, crowd summaries and alerts are available. We are testing detection on more representative scenes before claiming final accuracy.</p><p>{data.training?.status === "completed" ? "The latest training experiment has finished. The stronger previous model remains our aerial candidate." : "Training updates are available in the detailed view."}</p><details className="metric-details"><summary>Training details</summary><TrainingProgress training={data.training} /></details></section>;
+  if (mode === "development") return <section className="focused-panel"><h2>Working prototype · validation continues</h2><p>New anonymous uploads use separate aerial and ground detectors. We are testing more representative scenes before claiming final accuracy. Legacy tracking runs remain unchanged.</p><p>{data.training?.status === "completed" ? "The latest training experiment has finished; its checkpoint is not automatically deployed." : "The current experiment's progress is available below."}</p><a className="secondary-button" href="/training">Watch training progress</a><details className="metric-details"><summary>Training details</summary><TrainingProgress training={data.training} /></details></section>;
   if (mode === "benchmarks") return <section className="focused-panel"><h2>Research comparisons</h2><p>These benchmark results describe separate experiments, rather than an accuracy score for the footage playing above.</p><details className="metric-details"><summary>Open ground-detector comparison</summary><GroundBenchmark benchmark={data.groundBenchmark} /></details><FullMotBenchmark benchmark={data.benchmark} /></section>;
-  if (mode === "performance") return <section className="focused-panel"><h2>Technical details</h2><details className="metric-details"><summary>Processing information</summary><p>{run.detector} · {number(run.metrics.frames)} processed frames · {number(run.metrics.processingFps, 2)} frames/second</p><PerformanceWorkspace run={run} metrics={run.metrics} /></details></section>;
+  if (mode === "performance") return <section className="focused-panel"><h2>Technical details</h2>{versions.length > 1 && <details className="metric-details"><summary>Saved analyses of this same footage</summary><p>Changing this version selects another saved output, not another source video. Its counts may differ because the detector or processing settings differ.</p><label className="frame-limit"><span>Analysis version</span><select aria-label="Saved analysis version" value={run.id} onChange={(event) => onSelectAnalysis(event.target.value)}>{versions.map((version) => <option key={version.id} value={version.id}>{version.analysisType === "anonymous_detection" ? "Anonymous counting" : "Legacy tracking"} · {new Date(version.updatedAt).toLocaleString("en-IN")}</option>)}</select></label></details>}<details className="metric-details"><summary>Processing information</summary><p>{run.detector} · {number(run.metrics.frames)} processed frames · {number(run.metrics.processingFps, 2)} frames/second</p><PerformanceWorkspace run={run} metrics={run.metrics} /></details></section>;
   if (mode === "review") return <section className="focused-panel"><h2>Saved appearance review</h2><p>Similar appearance does not confirm that two people are the same person.</p>{run.isMulti ? <details className="metric-details"><summary>Open existing review candidates</summary><ReIdCandidates reid={run.reid} /></details> : <p>This recording has one camera view.</p>}</section>;
   return null;
 }
@@ -123,8 +174,12 @@ function OccupancyChart({ timeline }) {
   const max = Math.max(...points.map((point) => point.count), 1);
   const width = 680;
   const height = 184;
+  const position = (point) => point.seconds ?? point.frame;
+  const firstPosition = position(points[0]);
+  const span = Math.max(1e-6, position(points.at(-1)) - firstPosition);
+  const xFor = (point) => (position(point) - firstPosition) / span * width;
   const path = points.map((point, index) => {
-    const x = points.length === 1 ? 0 : (index / (points.length - 1)) * width;
+    const x = xFor(point);
     const y = height - (point.count / max) * (height - 26) - 12;
     return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
@@ -133,7 +188,7 @@ function OccupancyChart({ timeline }) {
       {[0.2, 0.5, 0.8].map((fraction) => <line key={fraction} x1="0" x2={width} y1={height * fraction} y2={height * fraction} className="grid-line" />)}
       <path d={path} className="chart-line" />
       {points.map((point, index) => {
-        const x = points.length === 1 ? 0 : (index / (points.length - 1)) * width;
+        const x = xFor(point);
         const y = height - (point.count / max) * (height - 26) - 12;
         return <circle key={`${point.frame}-${index}`} cx={x} cy={y} r="4" className="chart-point" />;
       })}
@@ -346,6 +401,7 @@ function UploadRunPanel({ onCompleted, initiallyOpen = false }) {
   const [aerial, setAerial] = useState(null);
   const [ground, setGround] = useState(null);
   const [maxFrames, setMaxFrames] = useState("600");
+  const [aerialProfile, setAerialProfile] = useState("aerial");
   const [job, setJob] = useState(null);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -380,6 +436,7 @@ function UploadRunPanel({ onCompleted, initiallyOpen = false }) {
       form.append("aerial", aerial);
       form.append("ground", ground);
       form.append("maxFrames", maxFrames);
+      form.append("aerialProfile", aerialProfile);
       const response = await fetch("/api/upload-run", { method: "POST", body: form });
       const result = await response.json();
       if (!response.ok) throw new Error(result.error ?? "The upload run could not start.");
@@ -393,16 +450,17 @@ function UploadRunPanel({ onCompleted, initiallyOpen = false }) {
   return <details className="card upload-run-panel" open={initiallyOpen}>
     <summary className="upload-summary"><span><span className="eyebrow">YOUR TWO-CAMERA RUN</span><strong>Upload and analyse another video pair</strong></span><span className="subtle-pill">Open uploader</span></summary>
     <div className="upload-run-content">
-    <div className="card-heading"><div><span className="eyebrow">YOUR TWO-CAMERA RUN</span><h2>Upload aerial and ground videos</h2><p>Files remain on this computer. The system detects people, creates local tracks, and produces visual-similarity suggestions for manual review.</p></div><span className="subtle-pill">Local processing</span></div>
+    <div className="card-heading"><div><span className="eyebrow">YOUR TWO-CAMERA RUN</span><h2>Upload aerial and ground videos</h2><p>Files remain on this computer. The aerial-trained detector and a separate ground detector estimate crowd counts independently. No identity matching is performed.</p></div><span className="subtle-pill">Local processing</span></div>
     <form className="upload-form" onSubmit={submit}>
       <label className={aerial ? "upload-slot upload-slot-ready" : "upload-slot"}><Upload size={19} /><span><b>Aerial / drone video</b><small>{aerial ? aerial.name : "MP4, AVI, MOV, MKV, MPG or WebM"}</small></span><input type="file" accept="video/*,.mp4,.avi,.mov,.mkv,.mpg,.mpeg,.webm" onChange={(event) => setAerial(event.target.files?.[0] ?? null)} /></label>
       <label className={ground ? "upload-slot upload-slot-ready" : "upload-slot"}><Upload size={19} /><span><b>Ground surveillance video</b><small>{ground ? ground.name : "MP4, AVI, MOV, MKV, MPG or WebM"}</small></span><input type="file" accept="video/*,.mp4,.avi,.mov,.mkv,.mpg,.mpeg,.webm" onChange={(event) => setGround(event.target.files?.[0] ?? null)} /></label>
       <label className="frame-limit"><span>Frames per camera</span><input type="number" min="1" max="20000" value={maxFrames} onChange={(event) => setMaxFrames(event.target.value)} placeholder="Full video" /><small>Use 600 for a quick demo, or clear this field for the full videos.</small></label>
+      <label className="frame-limit"><span>Aerial upload viewpoint</span><select value={aerialProfile} onChange={(event) => setAerialProfile(event.target.value)}><option value="aerial">Drone / top-down · aerial detector</option><option value="general">Ground-level / elevated CCTV · general detector</option></select><small>Select the actual viewpoint. The aerial-trained model can miss people in ground-level clips.</small></label>
       <button className="primary-button upload-submit" disabled={submitting || ["queued", "processing"].includes(status)}><Upload size={17} /> {submitting ? "Uploading…" : status === "processing" || status === "queued" ? "Processing…" : "Start two-camera analysis"}</button>
     </form>
     {message && <p className="upload-message upload-message-error">{message}</p>}
     {job && <div className={status === "failed" ? "upload-message upload-message-error" : "upload-message"}><strong>{status === "completed" ? "Analysis complete" : status === "failed" ? "Analysis failed" : "Working on your run"}</strong><span>{job.error ?? job.stage}</span>{status === "completed" && <small>Your new run is selected above. Open the playback below to review it.</small>}</div>}
-    <p className="upload-privacy"><CircleAlert size={14} /> Similar-looking people are only placed in a manual-review queue; the project does not verify identity or make automated decisions about people.</p>
+    <p className="upload-privacy"><CircleAlert size={14} /> Counts are estimates, not verified identities or unique visitors. Please do not start an upload while GPU training is running.</p>
     </div>
   </details>;
 }
@@ -500,12 +558,13 @@ export default function DashboardClient() {
             </div>
           </div>
           {error && <p className="upload-message upload-message-error" role="alert">{error}</p>}
-          <div className="selected-footage-bar"><div><Video size={18} /><span><small>Selected footage · stays the same across all views</small><strong>{selectedRecording?.label ?? (loading ? "Loading your footage…" : "Choose a recording")}</strong></span></div><details className="footage-picker"><summary>Change footage <ChevronDown size={14} /></summary><div className="footage-options">{recordings.map((recording) => <button key={recording.key} aria-pressed={recording.key === selection?.recordingKey} onClick={(event) => { setSelection({ runId: recording.run.id, recordingKey: recording.key }); event.currentTarget.closest("details").open = false; }}>{recording.label}</button>)}{!recordings.length && <p>No saved recordings yet. Upload a pair below.</p>}</div></details></div>
+          <div className="selected-footage-bar"><div><Video size={18} /><span><small>Selected footage · stays the same across all views</small><strong>{run ? footageLabel(run, selectedRecording?.uploaded) : (loading ? "Loading your footage…" : "Choose a recording")}</strong></span></div><details className="footage-picker"><summary>Change footage <ChevronDown size={14} /></summary><div className="footage-options">{recordings.map((recording) => <button key={recording.key} aria-pressed={recording.run.id === selection?.runId} onClick={(event) => { setSelection({ runId: recording.run.id, recordingKey: recording.key }); event.currentTarget.closest("details").open = false; }}>{recording.label}</button>)}{!recordings.length && <p>No saved recordings yet. Upload a pair below.</p>}</div></details></div>
           <UploadRunPanel onCompleted={selectUploadedRun} initiallyOpen={!loading && !recordings.length} />
           {run ? <>
             <section className="card video-card focused-video-card"><FootagePlayer run={run} />{!run.isMulti && <div className="video-footer"><a href={run.videoUrl} download><Download size={15} /> Download annotated video</a></div>}</section>
+            {run.countWarning && <p role="alert" className="upload-message upload-message-error">{run.countWarning}</p>}
             <ImportantCounts run={run} />
-            <div className="card focused-result" aria-live="polite"><FocusedPanel mode={activeSection} run={run} data={data} /></div>
+            <div className="card focused-result" aria-live="polite"><FocusedPanel key={activeSection} mode={activeSection} run={run} data={data} versions={selectedRecording?.runs} onSelectAnalysis={(runId) => { if (selectedRecording?.runs.some((version) => version.id === runId)) setSelection({ runId, recordingKey: selectedRecording.key }); }} /></div>
           </> : <div className="empty-state"><Video size={26} /><strong>{loading ? "Loading your recording…" : selection ? "The selected recording is unavailable" : "Upload footage to get started"}</strong><span>{selection && !loading ? "Use Change footage to choose another recording." : "Choose aerial and ground clips in the uploader."}</span></div>}
         </div>
       </section>

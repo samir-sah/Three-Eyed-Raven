@@ -87,11 +87,11 @@ def clean_metrics(metrics) -> dict:
     return {key: float(value) for key, value in metrics.items() if math.isfinite(float(value))}
 
 
-def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, size: int, batch: int, hours: float, smoke: bool, learning_rate: float | None = None, warmup_epochs: float = 1, workers: int = 2) -> Path:
+def fit_stage(checkpoint: Path, directory: Path, data: Path, state: Status, *, size: int, batch: int, hours: float, smoke: bool, learning_rate: float | None = None, warmup_epochs: float = 1, workers: int = 2, stage_name: str | None = None) -> Path:
     import torch
     from ultralytics import YOLO
 
-    name = f"visdrone_person_{size}"
+    name = stage_name or f"visdrone_person_{size}"
     folder = directory / name
     current = {"name": name, "status": "training", "imgsz": size, "budgetHours": hours, "checkpoint_source": str(checkpoint), "startedAt": now()}
     state.data["stages"].append(current)

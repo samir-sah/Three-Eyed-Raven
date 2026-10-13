@@ -2,6 +2,7 @@ import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import path from "node:path";
 import { readGroundBenchmark } from "../../../lib/ground-benchmark";
 import { readTrainingExperiment } from "../../../lib/training-status";
+import { countSummary, sampleCountTimeline, countLogComplete } from "../../../lib/count-summary.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -252,6 +253,7 @@ function readRun(runId) {
   return {
     id: runId,
     label: runId.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase()),
+    alertsEnabled: alerts.length > 0 || (summary.config?.zones ?? []).some((zone) => Number(zone.occupancy_alert_threshold) > 0),
     updatedAt: statSync(summaryPath).mtime.toISOString(),
     hasVideo: existsSync(videoPath),
     videoUrl: `/api/artifacts/${encodeURIComponent(runId)}/annotated.mp4`,
@@ -283,6 +285,7 @@ function readMultiRun(runId) {
   const summaryPath = path.join(runDirectory, "summary.json");
   const summary = safeJson(summaryPath, {});
   const reidReport = safeJson(path.join(runDirectory, "reid_candidates.json"), { summary: {}, candidates: [] });
+  const anonymous = summary.analysis_type === "anonymous_detection";
   const fallbackModel = summary.config?.model;
   const candidateThreshold = Number(reidReport.summary?.candidate_threshold ?? 0.72);
   const crossCameraSummary = summarizeCrossCameraCandidates(reidReport.candidates, candidateThreshold);
@@ -302,22 +305,32 @@ function readMultiRun(runId) {
       ids.add(observation.track_id);
       frameCounts.set(frame, ids);
     }
-    const peakCount = Math.max(0, ...[...frameCounts.values()].map((ids) => ids.size));
-    const peakFrame = [...frameCounts.entries()].find(([, ids]) => ids.size === peakCount)?.[0] ?? 0;
+    const countRows = readJsonLines(path.join(cameraDirectory, "counts.jsonl"));
+    const counts = countSummary(countRows);
+    const countsVerified = !anonymous || (countLogComplete(countRows, camera.frames_processed) && counts.peakCount === camera.peak_count);
+    const configuredZones = summary.config?.cameras?.find((entry) => entry.id === camera.camera_id)?.zones ?? [];
+    const peakCount = anonymous ? counts.peakCount : Math.max(0, ...[...frameCounts.values()].map((ids) => ids.size));
+    const peakFrame = anonymous ? counts.peakFrame : [...frameCounts.entries()].find(([, ids]) => ids.size === peakCount)?.[0] ?? 0;
     const averageConfidence = observations.length
       ? observations.reduce((total, item) => total + (item.confidence ?? 0), 0) / observations.length
       : 0;
     return {
       id: camera.camera_id,
-      label: cameraLabel(camera.camera_id),
+      label: camera.label || cameraLabel(camera.camera_id),
       detector: detectorLabel(camera.model ?? fallbackModel),
       previewFrames: preview.frames,
       previewFps: preview.previewFps,
+      videoUrl: existsSync(path.join(cameraDirectory, "browser.mp4")) ? `/api/videos/${encodeURIComponent(runId)}/${encodeURIComponent(camera.camera_id)}` : null,
+      duration: camera.duration_seconds ?? 0,
+      timeline: anonymous ? sampleCountTimeline(counts.timeline) : [],
+      peakSeconds: anonymous ? counts.peakSeconds : peakFrame / (camera.source_fps || 30),
+      alertsEnabled: camera.alerts_enabled ?? (alerts.length > 0 || configuredZones.some((zone) => Number(zone.occupancy_alert_threshold) > 0)),
       source: camera.source,
       resolution: camera.source_resolution?.join(" × ") ?? "—",
       frames: camera.frames_processed,
       localTracks: camera.unique_local_track_ids,
       peakCount,
+      countsVerified,
       peakFrame,
       averageConfidence,
       alertCount: alerts.length,
@@ -348,8 +361,11 @@ function readMultiRun(runId) {
     id: runId,
     label: runId.startsWith("upload_") ? "Uploaded two-camera run" : "Two Stream Demo",
     isMulti: true,
+    analysisType: summary.analysis_type ?? "legacy_tracking",
+    countWarning: streams.some((stream) => !stream.countsVerified) ? "One camera's count log is incomplete or inconsistent. Its count is unavailable; inspect the saved artifacts." : null,
+    alertsEnabled: streams.some((stream) => stream.alertsEnabled),
     updatedAt: statSync(summaryPath).mtime.toISOString(),
-    hasVideo: streams.some((stream) => stream.previewFrames.length),
+    hasVideo: streams.some((stream) => stream.previewFrames.length || stream.videoUrl),
     detector: detectorLabels.length === 1 ? detectorLabels[0] : "Per-camera detector policy",
     streams,
     reid: {

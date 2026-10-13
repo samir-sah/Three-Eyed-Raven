@@ -13,8 +13,9 @@ export function readGroundBenchmark() {
       completedImages: status.evaluationImagesDone, totalImages: status.evaluationImagesTotal };
     if (status.status !== "completed") return base;
     const comparison = JSON.parse(readFileSync(path.join(folder, "comparison.json"), "utf8"));
+    const manifest = JSON.parse(readFileSync(path.join(folder, "manifest.json"), "utf8"));
     if (comparison.smoke) return null;
-    return { ...base, protocol: comparison.protocol, evaluations: comparison.evaluations.map((item) => ({
+    return { ...base, images: base.images ?? manifest.images.length, scenes: base.scenes ?? manifest.scenes, protocol: { ...comparison.protocol, limitations: comparison.limitations ?? comparison.protocol.limitations }, evaluations: comparison.evaluations.map((item) => ({
       name: item.name, checkpoint: item.checkpoint, resolution: item.resolution,
       detection: item.report_detection,
       default: item.report_default, tuned: item.report_tuned,

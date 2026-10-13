@@ -33,7 +33,7 @@ export default function TrainingPage() {
   const stale = experiment && !finished && Date.now() - new Date(experiment.updatedAt).getTime() > 300000;
   const progress = experiment?.batchesTotal ? Math.min(100, (experiment.batchesDone || 0) / experiment.batchesTotal * 100) : 0;
   return <main className="training-monitor">
-    <header><div><span className="eyebrow">THREE EYED RAVEN / DEVELOPMENT</span><h1>Crowd detection training</h1><p>Full-data experiments and aggregate crowd-count evaluation.</p></div><Link href="/">← Dashboard</Link></header>
+    <header><div><span className="eyebrow">THREE EYED RAVEN / DEVELOPMENT</span><h1>Crowd detection training</h1><p>{experiment?.datasetDescription ?? "Detection experiments and aggregate crowd-count evaluation."}</p></div><Link href="/">← Dashboard</Link></header>
     {loading && <p role="status">Reading experiment progress…</p>}
     {error && <p role="alert">{error}</p>}
     {!loading && !error && !experiment && <section className="card monitor-card">No extended experiment has started yet.</section>}
@@ -49,7 +49,7 @@ export default function TrainingPage() {
         {experiment.error && <details><summary>Failure details</summary><pre>{experiment.error}</pre></details>}
       </section>
       <section className="monitor-metrics">
-        <div className="card monitor-card"><span>Training images</span><strong>{numeric(experiment.dataset?.train?.images)}</strong><small>Full training split for each extended stage</small></div>
+        <div className="card monitor-card"><span>Training images</span><strong>{numeric(experiment.dataset?.train?.images)}</strong><small>Images actually used in this experiment</small></div>
         <div className="card monitor-card"><span>Validation images</span><strong>{numeric(experiment.dataset?.val?.images)}</strong><small>Checkpoint selection and development evaluation</small></div>
         <div className="card monitor-card"><span>Training budget</span><strong>{numeric(experiment.budgetHours, 1)} hours</strong><small>Plus dataset checks and final evaluation</small></div>
       </section>
@@ -57,7 +57,7 @@ export default function TrainingPage() {
         <p>Each stage saves best and latest checkpoints after completed epochs. Early stopping can finish a stage before its time budget.</p>
         {experiment.stages?.map(stage => <div className="monitor-stage" key={stage.name}><div><strong>{stage.imgsz} px</strong><p>{stage.status} · {numeric(stage.epoch)} completed epochs · {numeric(stage.budgetHours, 1)} hour budget</p></div><div><span>Latest validation mAP50–95</span><strong>{percent(stage.metrics?.["metrics/mAP50-95(B)"])}</strong></div></div>)}
       </section>
-      {experiment.comparison && <section className="card monitor-card"><span className="eyebrow">MEASURED RESULTS</span><h2>Model comparison</h2><p>{experiment.comparison.limitation}</p><div className="monitor-table"><table><thead><tr><th>Model</th><th>mAP50</th><th>mAP50–95</th><th>Count MAE ↓</th><th>Count RMSE ↓</th><th>Threshold</th></tr></thead><tbody>{experiment.comparison.evaluations.map(result => <tr key={result.name}><td>{result.name.replaceAll("_", " ")}</td><td>{percent(result.detection["metrics/mAP50(B)"])}</td><td>{percent(result.detection["metrics/mAP50-95(B)"])}</td><td>{numeric(result.counts.report.mae, 2)}</td><td>{numeric(result.counts.report.rmse, 2)}</td><td>{numeric(result.counts.selected_threshold, 2)}</td></tr>)}</tbody></table></div><p>MAE is the average absolute counting error per image. Lower is better. Confidence thresholds are fitted on a separate calibration partition.</p>{experiment.comparison.errors?.length > 0 && <details><summary>Stage errors ({experiment.comparison.errors.length})</summary><pre>{JSON.stringify(experiment.comparison.errors, null, 2)}</pre></details>}</section>}
+      {experiment.comparison && <section className="card monitor-card"><span className="eyebrow">MEASURED RESULTS</span><h2>Model comparison</h2><p>{experiment.comparison.limitation}</p><div className="monitor-table"><table><thead><tr><th>Model</th><th>mAP50</th><th>mAP50–95</th><th>Count MAE ↓</th><th>Count RMSE ↓</th><th>Threshold</th></tr></thead><tbody>{experiment.comparison.evaluations.map(result => <tr key={result.name}><td>{result.name.replaceAll("_", " ")}</td><td>{percent(result.detection["metrics/mAP50(B)"])}</td><td>{percent(result.detection["metrics/mAP50-95(B)"])}</td><td>{numeric(result.counts.report.mae, 2)}</td><td>{numeric(result.counts.report.rmse, 2)}</td><td>{numeric(result.counts.selected_threshold, 2)}</td></tr>)}</tbody></table></div><p>MAE is the average absolute counting error per image. Lower is better. The saved report explains whether thresholds were calibrated or fixed.</p>{experiment.comparison.errors?.length > 0 && <details><summary>Stage errors ({experiment.comparison.errors.length})</summary><pre>{JSON.stringify(experiment.comparison.errors, null, 2)}</pre></details>}</section>}
       <details className="card monitor-card"><summary>Checkpoint and report locations</summary><p>{experiment.reportPath || `runs/experiments/${experiment.name}`}</p><pre>{JSON.stringify(experiment.stages?.map(({ name, bestCheckpoint, lastCheckpoint }) => ({ name, bestCheckpoint, lastCheckpoint })), null, 2)}</pre></details>
     </>}
   </main>;
