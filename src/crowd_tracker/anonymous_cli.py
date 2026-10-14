@@ -13,6 +13,7 @@ from pathlib import Path
 from .extended_detection_cli import atomic_json, now
 from .storage import RunStore
 from .detection_profiles import DetectionProfile, predict_boxes
+from .marker_codes import validate_marker_config, summarize_marker_cameras
 
 
 def count_boxes(boxes, width, height):
@@ -30,6 +31,7 @@ def count_boxes(boxes, width, height):
 
 
 def validate_config(config):
+    validate_marker_config(config.get("marker_demo"))
     cameras = config.get("cameras", [])
     if len(cameras) != 2 or {camera.get("id") for camera in cameras} != {"aerial", "ground"}:
         raise ValueError("Exactly one aerial and one ground video are required")
@@ -92,6 +94,7 @@ def analyse_camera(camera, config, output, progress):
     directory.mkdir()
     capture = cv2.VideoCapture(camera["source"])
     writer = None
+    marker_session = None
     failed = True
     started = time.perf_counter()
     try:
@@ -113,6 +116,10 @@ def analyse_camera(camera, config, output, progress):
         profile = DetectionProfile(**camera["detection_profile"]) if camera.get("detection_profile") else None
         if profile and str(device) == "cpu":
             profile = replace(profile, fp16=False)
+        marker_config = validate_marker_config(config.get("marker_demo"))
+        if marker_config["enabled"]:
+            from .marker_session import MarkerSession
+            marker_session = MarkerSession(directory, marker_config["allowed_codes"])
         count = peak = total_detections = 0
         with (directory / "counts.jsonl").open("w", encoding="utf-8") as counts:
             while config.get("max_frames_per_camera") is None or count < config["max_frames_per_camera"]:
@@ -129,6 +136,7 @@ def analyse_camera(camera, config, output, progress):
                     raw = result.boxes.data[:, :5].detach().cpu().tolist()
                 boxes = count_boxes(raw, width, height)
                 detected = len(boxes)
+                markers = marker_session.read(frame, count, count / fps) if marker_session else []
                 peak = max(peak, detected)
                 total_detections += detected
                 # Every decoded frame is logged, including an empty scene.
@@ -139,6 +147,13 @@ def analyse_camera(camera, config, output, progress):
                 sx, sy = writer.size[0] / width, writer.size[1] / height
                 for x1, y1, x2, y2, _ in boxes:
                     cv2.rectangle(annotated, (int(x1 * sx), int(y1 * sy)), (int(x2 * sx), int(y2 * sy)), (255, 255, 255), 2)
+                if markers:
+                    import numpy as np
+                    for marker in markers:
+                        polygon = np.asarray([[int(x * sx), int(y * sy)] for x, y in marker["corners"]], dtype=np.int32)
+                        cv2.polylines(annotated, [polygon], True, (255, 255, 255), 2)
+                        x, y = polygon[0]
+                        cv2.putText(annotated, f"Tag {marker['code']}", (int(x), max(15, int(y) - 7)), cv2.FONT_HERSHEY_SIMPLEX, .5, (255, 255, 255), 1, cv2.LINE_AA)
                 cv2.rectangle(annotated, (8, 8), (220, 43), (18, 18, 18), -1)
                 cv2.putText(annotated, f"People detected: {detected}", (17, 31), cv2.FONT_HERSHEY_SIMPLEX, .6, (255, 255, 255), 1, cv2.LINE_AA)
                 writer.write(annotated)
@@ -155,15 +170,20 @@ def analyse_camera(camera, config, output, progress):
                 "duration_seconds": count / fps, "processing_fps": count / elapsed, "alert_count": 0,
                 "alerts_enabled": False, "output_resolution": list(writer.size),
                 "runtime_detection_profile": asdict(profile) if profile else None,
-                "runtime_device": str(device)}
+                "runtime_device": str(device),
+                **({"markers": marker_session.summary(count)} if marker_session else {})}
     finally:
         capture.release()
-        if writer:
-            writer.close(failed)
-        if "model" in locals():
-            del model
-        gc.collect()
-        torch.cuda.empty_cache()
+        try:
+            if writer:
+                writer.close(failed)
+        finally:
+            if marker_session:
+                marker_session.close()
+            if "model" in locals():
+                del model
+            gc.collect()
+            torch.cuda.empty_cache()
 
 
 def run(config):
@@ -174,6 +194,9 @@ def run(config):
     started = time.perf_counter()
     try:
         cameras = [analyse_camera(camera, config, output, progress) for camera in config["cameras"]]
+        marker_config = validate_marker_config(config.get("marker_demo"))
+        if marker_config["enabled"]:
+            atomic_json(output / "markers.json", summarize_marker_cameras(cameras, marker_config["min_reads"]))
         elapsed = time.perf_counter() - started
         frames = sum(camera["frames_processed"] for camera in cameras)
         summary = {"run_type": "multi_stream", "analysis_type": "anonymous_detection",

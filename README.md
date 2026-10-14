@@ -19,6 +19,10 @@ For anonymous analysis from the terminal, copy `config.anonymous.example.json`, 
 
 For the fresh anonymous ground-detector comparison, see [the evaluation protocol](docs/DETECTION_EVALUATION_PROTOCOL.md) and [the measured 13 October baseline](docs/GROUND_DETECTION_BASELINE_20261013.md). The dashboard's **Model comparisons** view distinguishes this audit from the historical MOT17 tracking report.
 
+### Optional volunteer QR-tag demonstration
+
+For a controlled, volunteered demonstration, **Upload videos** now offers an optional visible QR-tag reader. Print anonymous tags V01–V99 from `/markers`, register the codes on the upload form, explicitly confirm the demonstration, and upload clips where the tags are readable. **Tag comparison** reports how many registered codes were decoded in at least three frames of each view, with clip-relative times and QR-only evidence. Normal uploads remain detection/counting only; existing clips are not automatically rescanned. A shared printed code is **not a verified person, appearance match or identity-accuracy score**. Duplicate tag locations are excluded, and missing/invalid reports are unavailable rather than a count of zero. See [the QR demo guide and verification record](docs/VOLUNTEER_QR_DEMO.md).
+
 ## Setup
 
 Use Python 3.10 or later. An NVIDIA CUDA-enabled PyTorch installation is recommended for real-time speed.

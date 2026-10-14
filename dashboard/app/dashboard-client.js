@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import GroundBenchmark from "./ground-benchmark";
 import IndependentFootagePlayer from "./footage-player";
+import MarkerDemoOptions, { DEFAULT_MARKER_DEMO, markerDemoValidation } from "./marker-demo-options";
+import MarkerReview from "./marker-review";
 import { chooseWorkspaceSelection, footageLabel, recordingKey, recordingsFromRuns, selectedRun } from "../lib/recordings.mjs";
 import { Activity, Bell, CheckCircle2, CircleAlert, Cpu, Eye, FolderKanban, Gauge, LayoutDashboard, Menu, RefreshCw, ShieldCheck, Upload, Video } from "lucide-react";
 
-const navItems = [["overview", LayoutDashboard, "Overview"], ["upload", Upload, "Upload videos"], ["video-runs", Video, "Playback"], ["tracking", Activity, "Crowd activity"], ["alerts", ShieldCheck, "Alerts"], ["development", FolderKanban, "Project progress"]];
+const navItems = [["overview", LayoutDashboard, "Overview"], ["upload", Upload, "Upload videos"], ["video-runs", Video, "Playback"], ["markers", Eye, "Tag comparison"], ["tracking", Activity, "Crowd activity"], ["alerts", ShieldCheck, "Alerts"], ["development", FolderKanban, "Project progress"]];
 const advancedNav = [["benchmarks", Gauge, "Model comparisons"], ["performance", Cpu, "Technical details"]];
 const modeLabel = (mode) => [...navItems, ...advancedNav].find(([id]) => id === mode)?.[2] ?? "Overview";
 const selectionStorageKey = "three-eyed-raven:fresh-upload-selection";
@@ -33,13 +35,15 @@ function ImportantCounts({ run }) {
 function NoAnalysis({ title = "No uploaded analysis yet", onUpload }) {
   return <section className="card fresh-empty"><Video size={30} /><h2>{title}</h2><p>Upload your own aerial and ground videos. Results appear only after that upload finishes processing.</p><button className="primary-button" onClick={onUpload}><Upload size={16} /> Upload video pair</button></section>;
 }
-function Overview({ run, onPlayback, onUpload }) {
+function Overview({ run, onPlayback, onUpload, onMarkers }) {
   return <section className="card focused-result fresh-overview" data-testid="overview-results"><div className="compact-heading"><div><span className="eyebrow">YOUR SELECTED ANALYSIS</span><h2>Fresh footage, measured counts</h2><p>Each result belongs to the clips named here—not a sample or historical benchmark.</p></div><span className="subtle-pill"><CheckCircle2 size={14} /> Complete</span></div><ImportantCounts run={run} />
     <div className="analysis-camera-list">{run.streams.map((stream) => <div key={stream.id}><Video size={18} /><span><strong>{run.sourceNames?.[stream.id] ?? stream.label}</strong><small>{stream.label} · {number(stream.frames)} analysed frames · {clipTime(stream.duration)}</small></span></div>)}</div>
+    {run.markerReport && <div className="marker-overview-summary"><strong>{run.markerReport.status === "ready" ? `${run.markerReport.sharedCount} shared QR codes` : "QR report unavailable"}</strong><span>Explicit printed codes—not matched people or verified identities.</span><button className="secondary-button" onClick={onMarkers}>Open tag comparison</button></div>}
     <p className="fresh-note">Per-frame estimates, not unique people. The views can contain the same people, so their counts must not be added.</p><div className="fresh-actions"><button className="primary-button" onClick={onPlayback}><Video size={16} /> Watch annotated videos</button><button className="secondary-button" onClick={onUpload}><Upload size={16} /> Upload another pair</button></div>
   </section>;
 }
 function WorkspacePanel({ mode, run, data, onUpload }) {
+  if (mode === "markers") return <MarkerReview key={run?.id ?? "no-upload"} report={run?.markerReport} streams={run?.streams} />;
   if (mode === "development") return <section className="card focused-result focused-panel"><span className="eyebrow">CURRENT PRODUCT</span><h2>Upload → detect → inspect</h2><p>New uploads use anonymous detection, per-camera crowd counts and annotated playback. Tracking and identity matching are not part of this workflow.</p><div className="product-capabilities"><span><CheckCircle2 size={16} /> Separate aerial / ground detectors</span><span><CheckCircle2 size={16} /> Independent playback controls</span><span><CheckCircle2 size={16} /> Counts from your uploaded frames</span><span><CircleAlert size={16} /> Independent field testing still needed</span></div><p>Ground uploads use the approved accuracy-first profile. True drone views keep the aerial-trained detector. Laptop analysis can be slower than real-time.</p><a className="secondary-button" href="/training">Open experiment report</a></section>;
   if (mode === "benchmarks") return <section className="card focused-result focused-panel"><h2>Research benchmark—not uploaded-video accuracy</h2><p>This separate development evaluation measures the detector on labelled images. Your own clip counts are in Overview and Crowd activity.</p><GroundBenchmark benchmark={data.groundBenchmark} /></section>;
   if (!run) return <NoAnalysis onUpload={onUpload} />;
@@ -54,6 +58,7 @@ function UploadRunPanel({ onStarted, onCompleted, onFailed }) {
   const [ground, setGround] = useState(null);
   const [maxFrames, setMaxFrames] = useState("");
   const [aerialProfile, setAerialProfile] = useState("aerial");
+  const [markerDemo, setMarkerDemo] = useState(DEFAULT_MARKER_DEMO);
   const [job, setJob] = useState(null);
   const [message, setMessage] = useState("");
   const [submitting, setSubmitting] = useState(false);
@@ -79,9 +84,12 @@ function UploadRunPanel({ onStarted, onCompleted, onFailed }) {
   async function submit(event) {
     event.preventDefault(); if (busy) return;
     if (!aerial || !ground) { setMessage("Choose both aerial and ground-surveillance videos."); return; }
+    const markerError = markerDemoValidation(markerDemo);
+    if (markerError) { setMessage(markerError); return; }
     setSubmitting(true); setMessage("");
     try {
       const form = new FormData(); form.append("aerial", aerial); form.append("ground", ground); form.append("maxFrames", maxFrames); form.append("aerialProfile", aerialProfile);
+      form.append("markerDemo", JSON.stringify(markerDemo));
       const response = await fetch("/api/upload-run", { method: "POST", body: form });
       const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "The upload could not start.");
       setJob(result); onStarted(result.runId);
@@ -94,6 +102,7 @@ function UploadRunPanel({ onStarted, onCompleted, onFailed }) {
       <label className={`upload-slot${ground ? " upload-slot-ready" : ""}`}><Upload size={24} /><span><b>Ground surveillance video</b><small>{ground?.name ?? "Choose a ground-camera video"}</small></span><input aria-label="Ground surveillance video" disabled={busy} type="file" accept="video/*,.mp4,.avi,.mov,.mkv,.mpg,.mpeg,.webm" onChange={(event) => setGround(event.target.files?.[0] ?? null)} /></label>
       <label className="frame-limit"><span>Viewpoint of the first clip</span><select disabled={busy} value={aerialProfile} onChange={(event) => setAerialProfile(event.target.value)}><option value="aerial">Drone / top-down · aerial detector</option><option value="general">Ground-level / elevated CCTV · ground detector</option></select><small>Select the actual viewpoint; elevated CCTV is not necessarily drone footage.</small></label>
       <label className="frame-limit"><span>Frame limit per camera (optional)</span><input disabled={busy} type="number" min="1" max="20000" value={maxFrames} onChange={(event) => setMaxFrames(event.target.value)} placeholder="Full video" /><small>Blank analyses the full video. Enter 600 for a shorter test; only those frames are counted.</small></label>
+      <MarkerDemoOptions value={markerDemo} onChange={setMarkerDemo} disabled={busy} />
       <div className="fresh-upload-footer"><p>Accuracy-first analysis can take longer than clip playback. Playback starts paused when ready.</p><button className="primary-button" disabled={busy || !aerial || !ground}><Upload size={17} />{submitting ? "Uploading…" : busy ? "Analysing…" : "Analyse my videos"}</button></div>
     </form>{message && <p className="upload-message upload-message-error" role="alert">{message}</p>}{job && <div className={`upload-message${job.status === "failed" ? " upload-message-error" : ""}`} role="status"><strong>{job.status === "completed" ? "Your analysis is complete" : job.status === "failed" ? "Analysis failed" : "Processing your uploaded videos"}</strong><span>{job.error ?? job.stage ?? "Preparing analysis…"}</span></div>}<p className="fresh-note">Counts are independent in each view. This workflow does not confirm identities or match people across cameras.</p>
   </section>;
@@ -150,7 +159,7 @@ export default function DashboardClient() {
         {error && <p className="upload-message upload-message-error" role="alert">{error}</p>}
         {run && activeSection !== "upload" && <div className="selected-footage-bar"><div><Video size={18} /><span><small>Results for these uploaded clips</small><strong>{Object.values(run.sourceNames ?? {}).join(" + ") || footageLabel(run)}</strong></span></div>{recordings.length > 1 && <label className="fresh-run-picker"><span>Selected upload</span><select aria-label="Selected upload" value={run.id} onChange={(event) => { const chosen = data.runs.find((item) => item.id === event.target.value); if (chosen) setSelection({ workspaceId: data.workspaceId, runId: chosen.id, recordingKey: recordingKey(chosen) }); }}>{recordings.map((item) => <option key={item.run.id} value={item.run.id}>{footageLabel(item.run)}</option>)}</select></label>}</div>}
         <div hidden={!uploaderVisible} className="workspace-uploader"><UploadRunPanel onStarted={uploadStarted} onCompleted={selectUploadedRun} onFailed={uploadFailed} /></div>
-        {activeSection === "overview" && run && <Overview run={run} onPlayback={() => goToSection("video-runs")} onUpload={() => goToSection("upload")} />}
+        {activeSection === "overview" && run && <Overview run={run} onPlayback={() => goToSection("video-runs")} onUpload={() => goToSection("upload")} onMarkers={() => goToSection("markers")} />}
         <div hidden={activeSection !== "video-runs"} className="workspace-player">{run ? <section className="card focused-video-card"><IndependentFootagePlayer key={run.id} run={run} active={activeSection === "video-runs"} /></section> : <NoAnalysis title={pendingRun.current ? "Your new videos are still processing" : "No videos loaded"} onUpload={() => goToSection("upload")} />}</div>
         {!['overview', 'upload', 'video-runs'].includes(activeSection) && <WorkspacePanel mode={activeSection} run={run} data={data} onUpload={() => goToSection("upload")} />}
         {run?.countWarning && activeSection !== "upload" && <p role="alert" className="upload-message upload-message-error">{run.countWarning}</p>}

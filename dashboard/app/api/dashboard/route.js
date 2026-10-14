@@ -5,6 +5,7 @@ import { readTrainingExperiment } from "../../../lib/training-status";
 import { countSummary, sampleCountTimeline, countLogComplete } from "../../../lib/count-summary.mjs";
 import { readDashboardWorkspace, isCurrentWorkspaceUpload } from "../../../lib/dashboard-workspace.mjs";
 import { readUploadJob } from "../../../lib/upload-jobs.js";
+import { readMarkerReport } from "../../../lib/marker-report.mjs";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -367,6 +368,7 @@ function readMultiRun(runId, job) {
     workspaceId: job?.workspaceId ?? null,
     createdAt: job?.createdAt ?? null,
     sourceNames: job?.sourceNames ?? {},
+    markerReport: readMarkerReport(runDirectory, summary),
     label: runId.startsWith("upload_") ? "Uploaded two-camera run" : "Two Stream Demo",
     isMulti: true,
     analysisType: summary.analysis_type ?? "legacy_tracking",

@@ -8,6 +8,7 @@ import { spawn } from "node:child_process";
 import { readTrainingExperiment } from "./training-status.js";
 import { groundCameraConfig } from "./detection-policy.mjs";
 import { readDashboardWorkspace, isCurrentWorkspaceJob } from "./dashboard-workspace.mjs";
+import { validateMarkerDemo } from "./marker-report.mjs";
 
 const PROJECT_ROOT = path.resolve(process.cwd(), "..");
 const UPLOAD_ROOT = path.join(PROJECT_ROOT, "data", "uploads");
@@ -115,6 +116,19 @@ export async function startUploadRun(formData) {
   const groundExtension = validateUpload(ground, "ground");
   const aerialProfile = String(formData.get("aerialProfile") ?? "aerial");
   if (!["aerial", "general"].includes(aerialProfile)) throw new Error("Choose a valid aerial-video detector profile.");
+  let markerDemo = null;
+  const markerSource = formData.get("markerDemo");
+  if (markerSource !== null) {
+    if (typeof markerSource !== "string" || markerSource.length > 2000) throw new Error("Invalid marker demo configuration.");
+    let proposed;
+    try { proposed = JSON.parse(markerSource); } catch { throw new Error("Invalid marker demo configuration."); }
+    if (!proposed || typeof proposed !== "object" || Array.isArray(proposed) || typeof proposed.enabled !== "boolean") throw new Error("Marker mode needs an explicit boolean enablement.");
+    const valid = validateMarkerDemo(proposed);
+    if (valid) {
+      if (valid.minReads < 3) throw new Error("Shared QR tags require at least three decoded frames per view.");
+      markerDemo = { enabled: true, confirmed_volunteer_demo: true, allowed_codes: valid.codes, min_reads: valid.minReads };
+    }
+  }
   const rawMaxFrames = String(formData.get("maxFrames") ?? "600").trim();
   const maxFrames = rawMaxFrames ? Number(rawMaxFrames) : null;
   if (maxFrames !== null && (!Number.isInteger(maxFrames) || maxFrames < 1 || maxFrames > 20000)) throw new Error("Maximum frames must be a whole number between 1 and 20,000, or blank for the full videos.");
@@ -143,6 +157,7 @@ export async function startUploadRun(formData) {
     dashboard_workspace_id: workspace.workspace_id, upload_run_id: runId,
     output_dir: path.join("artifacts", runId), device: "auto", confidence_threshold: 0.35,
     max_frames_per_camera: maxFrames,
+    ...(markerDemo ? { marker_demo: markerDemo } : {}),
     cameras: [{ id: "aerial", label: aerialProfile === "aerial" ? "Aerial / drone view" : "Camera A · ground / elevated view", source: aerialPath,
       ...(aerialProfile === "aerial" ? { model: AERIAL_CHECKPOINT, imgsz: 960 } : groundConfig) },
       { id: "ground", source: groundPath, ...groundConfig }],

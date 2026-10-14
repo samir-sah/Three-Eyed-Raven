@@ -54,7 +54,8 @@ class AnonymousTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "match the camera checkpoint"):
                 validate_config({"cameras": cameras})
 
-    def _mock_profile_camera(self, predictions, *, device="auto", cuda_available=False):
+    def _mock_profile_camera(self, predictions, *, device="auto", cuda_available=False,
+                             marker_demo=None, marker_session=None, encoder_error=None):
         """Exercise real annotation/count code without a model, codec or GPU call."""
         import cv2
         import numpy as np
@@ -71,6 +72,8 @@ class AnonymousTests(unittest.TestCase):
             camera = {"id": "ground", "source": str(source), "model": str(checkpoint), "imgsz": 1536,
                       "detection_profile": profile}
             config = {"device": device, "confidence_threshold": .35, "max_frames_per_camera": len(predictions)}
+            if marker_demo is not None:
+                config["marker_demo"] = marker_demo
             read_index = 0
 
             def read_frame():
@@ -89,6 +92,8 @@ class AnonymousTests(unittest.TestCase):
             frames = []
             writer = Mock(size=(100, 80))
             writer.write.side_effect = lambda frame: frames.append(frame.copy())
+            if encoder_error is not None:
+                writer.close.side_effect = encoder_error
             model = SimpleNamespace(names={0: "person"}, predict=Mock())
             constructor = Mock(return_value=model)
             fake_ultralytics = SimpleNamespace(YOLO=constructor)
@@ -97,6 +102,7 @@ class AnonymousTests(unittest.TestCase):
             with patch.dict(sys.modules, {"ultralytics": fake_ultralytics, "torch": fake_torch}), \
                  patch("cv2.VideoCapture", return_value=capture), \
                  patch("cv2.rectangle", wraps=cv2.rectangle) as rectangles, \
+                 patch("crowd_tracker.marker_session.MarkerSession", return_value=marker_session), \
                  patch("crowd_tracker.anonymous_cli.BrowserVideoWriter", return_value=writer), \
                  patch("crowd_tracker.anonymous_cli.predict_boxes", side_effect=predictions) as predict:
                 summary = analyse_camera(camera, config, output, output / "progress.json")
@@ -160,6 +166,39 @@ class AnonymousTests(unittest.TestCase):
         self.assertEqual(calls[0].kwargs, {"device": 0})
         self.assertTrue(summary["runtime_detection_profile"]["fp16"])
         self.assertEqual(summary["runtime_device"], "0")
+
+    def test_opted_in_marker_scan_is_separate_from_detection_counts(self):
+        session = Mock()
+        session.read.return_value = [{"code": "V07", "corners": [[10, 50], [20, 50], [20, 60], [10, 60]]}]
+        session.summary.return_value = {"frames_processed": 1, "frames_scanned": 1,
+                                        "read_failures": 0, "observations": {}, "duplicate_codes": []}
+        config = {"enabled": True, "confirmed_volunteer_demo": True,
+                  "allowed_codes": ["V07"], "min_reads": 3}
+        summary, rows, _, _, _, _ = self._mock_profile_camera([[]], marker_demo=config, marker_session=session)
+        self.assertEqual(rows[0]["count"], 0)
+        self.assertEqual(rows[0]["boxes_scores"], [])
+        self.assertEqual(summary["markers"], session.summary.return_value)
+        session.read.assert_called_once()
+        self.assertEqual(session.read.call_args.args[1:], (0, 0))
+        session.summary.assert_called_once_with(1)
+        session.close.assert_called_once()
+
+    def test_marker_log_is_closed_even_if_encoder_finalization_fails(self):
+        session = Mock()
+        session.read.return_value = []
+        config = {"enabled": True, "confirmed_volunteer_demo": True, "allowed_codes": ["V07"]}
+        with self.assertRaisesRegex(RuntimeError, "encode failed"):
+            self._mock_profile_camera([[]], marker_demo=config, marker_session=session,
+                                      encoder_error=RuntimeError("encode failed"))
+        session.close.assert_called_once()
+
+    def test_disabled_marker_mode_never_reads_tags(self):
+        session = Mock()
+        summary, _, _, _, _, files = self._mock_profile_camera([[]], marker_demo={"enabled": False}, marker_session=session)
+        session.read.assert_not_called()
+        session.close.assert_not_called()
+        self.assertNotIn("markers", summary)
+        self.assertEqual(files, ["counts.jsonl"])
 
     def test_summary_and_partial_failure_preserved_without_identity_artifacts(self):
         with tempfile.TemporaryDirectory() as folder:

@@ -1,0 +1,87 @@
+.marker-demo-options {
+  grid-column: 1 / -1;
+  min-width: 0;
+  margin: 2px 0;
+  padding: 16px;
+  border: 1px solid #dedede;
+  border-radius: 12px;
+  background: #fafafa;
+}
+.marker-demo-options legend { padding: 0 5px; color: #6b6b6b; font-size: 11px; }
+.marker-demo-check { display: flex; align-items: flex-start; gap: 10px; color: #222; font-size: 12px; line-height: 1.5; cursor: pointer; }
+.marker-demo-check input { width: 16px; height: 16px; flex: 0 0 auto; margin: 2px 0 0; accent-color: #191919; }
+.marker-demo-check strong, .marker-demo-check small { display: block; }
+.marker-demo-check small { margin-top: 3px; color: #737373; font-size: 11px; }
+.marker-demo-options:disabled .marker-demo-check { cursor: default; opacity: .6; }
+.marker-demo-setup { display: grid; gap: 13px; margin-top: 15px; padding-top: 14px; border-top: 1px solid #e6e6e6; }
+.marker-demo-consent { font-weight: 600; }
+.marker-demo-code-entry { display: grid; gap: 6px; max-width: 600px; }
+.marker-demo-code-entry > label { color: #333; font-size: 11px; font-weight: 600; }
+.marker-demo-code-entry > input { width: 100%; min-height: 40px; padding: 9px 11px; border: 1px solid #d4d4d4; border-radius: 9px; background: #fff; color: #191919; font: inherit; font-size: 12px; }
+.marker-demo-code-entry > input[aria-invalid="true"] { border-color: #747474; border-style: dashed; }
+.marker-demo-code-entry > small, .marker-demo-help { margin: 0; color: #737373; font-size: 11px; line-height: 1.6; }
+.marker-demo-code-entry code { padding: 2px 4px; border-radius: 4px; background: #ececec; color: #202020; }
+.marker-demo-code-entry input:focus-visible, .marker-demo-check input:focus-visible, .marker-demo-evidence select:focus-visible, .marker-demo-seek:focus-visible, .marker-demo-print-link:focus-visible { outline: 2px solid #333; outline-offset: 3px; }
+.marker-demo-error { margin: 0; color: #272727; font-size: 11px; font-weight: 600; }
+.marker-demo-print-link { width: fit-content; color: #191919; font-size: 11px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.marker-demo-review { padding: 20px; }
+.marker-demo-review h2 { margin: 5px 0 10px; font-size: 18px; font-weight: 600; }
+.marker-demo-review > .marker-demo-help { margin: 9px 0; }
+.marker-demo-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.marker-demo-kpis { display: grid; grid-template-columns: repeat(auto-fit, minmax(165px, 1fr)); gap: 10px; margin: 9px 0 14px; }
+.marker-demo-kpi { min-width: 0; padding: 15px; border: 1px solid #e5e5e5; border-radius: 12px; background: #fafafa; }
+.marker-demo-kpi > span, .marker-demo-kpi > strong, .marker-demo-kpi > small { display: block; }
+.marker-demo-kpi > span { color: #666; font-size: 11px; }
+.marker-demo-kpi > strong { margin: 7px 0; color: #171717; font-size: 30px; font-weight: 700; line-height: 1.2; }
+.marker-demo-kpi > small { color: #777; font-size: 10px; line-height: 1.5; overflow-wrap: anywhere; }
+.marker-demo-kpi-primary { background: #191919; border-color: #191919; }
+.marker-demo-kpi-primary > strong { color: #fff; }
+.marker-demo-kpi-primary > span, .marker-demo-kpi-primary > small { color: #dedede; }
+.marker-demo-conclusion { max-width: 880px; margin: 0 0 15px; color: #656565; font-size: 12px; line-height: 1.6; }
+.marker-demo-conclusion strong { color: #242424; font-weight: 600; }
+.marker-demo-warnings { display: grid; gap: 8px; margin: 0 0 16px; padding: 12px 14px; border: 1px solid #d8d8d8; border-left: 3px solid #555; border-radius: 9px; background: #f5f5f5; }
+.marker-demo-warnings p { margin: 0; color: #626262; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.marker-demo-warnings strong { color: #282828; font-weight: 600; }
+.marker-overview-summary { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 14px; padding: 15px 16px; margin-top: 15px; border: 1px solid #dedede; border-radius: 10px; background: #fafafa; }
+.marker-overview-summary > strong { color: #191919; font-size: 18px; font-weight: 600; }
+.marker-overview-summary > span { flex: 1 1 180px; min-width: 0; color: #737373; font-size: 11px; line-height: 1.5; }
+.marker-overview-summary > .secondary-button { flex: 0 0 auto; margin-left: auto; }
+.marker-demo-evidence { margin-top: 16px; }
+.marker-demo-evidence-heading { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 10px; }
+.marker-demo-evidence-heading h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.marker-demo-evidence-heading label { display: flex; align-items: center; gap: 8px; color: #777; font-size: 10px; }
+.marker-demo-evidence-heading select { max-width: 185px; padding: 7px 9px; border: 1px solid #ddd; border-radius: 8px; color: #333; background: #fff; font: inherit; }
+.marker-demo-evidence-item { overflow: hidden; margin: 7px 0; border: 1px solid #e3e3e3; border-radius: 10px; }
+.marker-demo-evidence-item > summary { display: flex; align-items: center; gap: 12px; padding: 12px; list-style: none; cursor: pointer; }
+.marker-demo-evidence-item > summary::-webkit-details-marker { display: none; }
+.marker-demo-evidence-item > summary strong { flex: 0 0 auto; color: #191919; font-size: 12px; }
+.marker-demo-evidence-item > summary span { min-width: 0; flex: 1; color: #777; font-size: 11px; overflow-wrap: anywhere; }
+.marker-demo-evidence-item > summary small { flex: 0 0 auto; color: #555; font-size: 10px; }
+.marker-demo-evidence-item > summary small::after { content: " +"; }
+.marker-demo-evidence-item[open] > summary { background: #f5f5f5; }
+.marker-demo-evidence-item[open] > summary small::after { content: " −"; }
+.marker-demo-evidence-views { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; padding: 14px; }
+.marker-demo-evidence-view { min-width: 0; }
+.marker-demo-evidence-view h4 { margin: 0 0 10px; color: #333; font-size: 12px; font-weight: 600; }
+.marker-demo-evidence-view img { display: block; width: 150px; height: 150px; max-width: 100%; padding: 5px; border: 1px solid #e5e5e5; border-radius: 8px; background: #fff; object-fit: contain; }
+.marker-demo-evidence-missing { display: grid; width: 150px; max-width: 100%; height: 120px; place-content: center; border: 1px dashed #dedede; border-radius: 8px; color: #777; font-size: 10px; }
+.marker-demo-evidence-view p { display: grid; gap: 4px; margin: 10px 0 5px; color: #777; font-size: 11px; }
+.marker-demo-evidence-view p strong { color: #333; font-weight: 500; }
+.marker-demo-evidence-view > small { display: block; color: #888; font-size: 10px; line-height: 1.5; }
+.marker-demo-seek { margin-top: 8px; padding: 7px 9px; border: 1px solid #d7d7d7; border-radius: 7px; color: #333; background: #fff; font-size: 10px; }
+.marker-demo-more { margin-top: 10px; }
+.marker-demo-more > summary, .marker-demo-limitations > summary { cursor: pointer; color: #333; font-size: 11px; font-weight: 600; }
+.marker-demo-limitations { margin-top: 16px; padding-top: 13px; border-top: 1px solid #e5e5e5; }
+.marker-demo-limitations p { max-width: 860px; margin: 10px 0 0; color: #777; font-size: 11px; line-height: 1.6; }
+@media (max-width: 600px) {
+  .marker-demo-review { padding: 16px; }
+  .marker-demo-heading { flex-direction: column; gap: 3px; }
+  .marker-demo-kpis { grid-template-columns: 1fr; }
+  .marker-demo-evidence-heading { align-items: flex-start; flex-direction: column; }
+  .marker-demo-evidence-item > summary { flex-wrap: wrap; gap: 7px; }
+  .marker-demo-evidence-item > summary small { width: 100%; }
+  .marker-demo-evidence-views { grid-template-columns: 1fr; }
+  .marker-overview-summary { flex-direction: column; align-items: flex-start; }
+  .marker-overview-summary > span { flex-basis: auto; }
+  .marker-overview-summary > .secondary-button { margin-left: 0; }
+}
